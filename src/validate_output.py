@@ -102,12 +102,12 @@ def validate_transformations(
             outputs = json.loads(transformation["output_items"])
 
             # Check if all input/output items exist
-            for item in inputs + outputs:
-                if item["name"] not in valid_item_names:
+            for item_name in inputs + outputs:
+                if item_name not in valid_item_names:
                     orphan_count += 1
                     if orphan_count <= 5:
                         logger.warning(
-                            f"Orphan item '{item['name']}' in transformation {i}"
+                            f"Orphan item '{item_name}' in transformation {i}"
                         )
                     break
 

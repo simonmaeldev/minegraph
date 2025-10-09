@@ -97,8 +97,9 @@ class TestTransformation:
         )
 
         assert transformation.transformation_type == TransformationType.CRAFTING
-        assert len(transformation.inputs) == 9
+        assert len(transformation.inputs) == 1  # Deduplicated from 9 to 1
         assert len(transformation.outputs) == 1
+        assert transformation.inputs[0] == iron
         assert transformation.outputs[0] == iron_block
 
     def test_transformation_with_metadata(self):
@@ -116,6 +117,8 @@ class TestTransformation:
             },
         )
 
+        assert len(transformation.inputs) == 1  # Deduplicated from 15 to 1
+        assert transformation.inputs[0] == coal
         assert transformation.metadata["villager_type"] == "Armorer"
         assert transformation.metadata["level"] == "Novice"
 
@@ -154,3 +157,37 @@ class TestTransformation:
 
         assert transformation.metadata == {}
         assert isinstance(transformation.metadata, dict)
+
+    def test_transformation_deduplicates_inputs(self):
+        """Test that Transformation automatically deduplicates input items."""
+        stick = Item(name="Stick", url="https://minecraft.wiki/w/Stick")
+        wool = Item(name="Wool", url="https://minecraft.wiki/w/Wool")
+        painting = Item(name="Painting", url="https://minecraft.wiki/w/Painting")
+
+        # Create transformation with 8 sticks and 1 wool (painting recipe)
+        transformation = Transformation(
+            transformation_type=TransformationType.CRAFTING,
+            inputs=[stick] * 8 + [wool],
+            outputs=[painting],
+        )
+
+        # Should deduplicate to 2 unique items
+        assert len(transformation.inputs) == 2
+        assert stick in transformation.inputs
+        assert wool in transformation.inputs
+
+    def test_transformation_deduplicates_outputs(self):
+        """Test that Transformation automatically deduplicates output items."""
+        iron = Item(name="Iron Ingot", url="https://minecraft.wiki/w/Iron_Ingot")
+        gold = Item(name="Gold Ingot", url="https://minecraft.wiki/w/Gold_Ingot")
+
+        # Create transformation with duplicate outputs
+        transformation = Transformation(
+            transformation_type=TransformationType.CRAFTING,
+            inputs=[iron],
+            outputs=[gold, gold, gold],
+        )
+
+        # Should deduplicate to 1 unique output
+        assert len(transformation.outputs) == 1
+        assert transformation.outputs[0] == gold

@@ -46,7 +46,11 @@ class Transformation:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        """Validate transformation data."""
+        """Validate and deduplicate transformation data."""
+        # Deduplicate inputs and outputs while maintaining list type
+        self.inputs = list(set(self.inputs))
+        self.outputs = list(set(self.outputs))
+
         if not self.inputs:
             raise ValueError("Transformation must have at least one input")
         if not self.outputs:

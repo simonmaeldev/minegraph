@@ -166,13 +166,13 @@ def export_transformations_csv(transformations: List[Transformation], filepath: 
         for transformation in transformations:
             # Convert inputs to JSON array
             inputs_json = json.dumps([
-                {"name": item.name, "url": item.url}
+                item.name
                 for item in transformation.inputs
             ])
 
             # Convert outputs to JSON array
             outputs_json = json.dumps([
-                {"name": item.name, "url": item.url}
+                item.name
                 for item in transformation.outputs
             ])
 
