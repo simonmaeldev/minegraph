@@ -176,6 +176,44 @@ def find_item_in_slot(slot: Tag) -> List[Item]:
     return items
 
 
+def extract_category_from_element(element: Tag) -> Optional[str]:
+    """
+    Extract category/section name from element by traversing DOM to find nearest heading.
+
+    Args:
+        element: BeautifulSoup Tag to extract category from
+
+    Returns:
+        Normalized category name (lowercase with underscores) or None if not found
+    """
+    # Traverse up and look for previous headings
+    current = element
+    while current:
+        # Look for previous sibling headings (h2/h3)
+        for sibling in current.find_previous_siblings(['h2', 'h3']):
+            # Find mw-headline span inside the heading
+            headline = sibling.find('span', class_='mw-headline')
+            if headline:
+                headline_id = headline.get('id')
+                # Skip excluded sections
+                if headline_id and headline_id in EXCLUDED_CRAFTING_SECTIONS:
+                    return None
+
+                # Extract text content
+                category_text = headline.get_text(strip=True)
+                if category_text:
+                    # Normalize: lowercase, replace spaces with underscores, remove special chars
+                    normalized = category_text.lower()
+                    normalized = re.sub(r'[^\w\s]', '', normalized)  # Remove special chars
+                    normalized = normalized.replace(' ', '_')
+                    return normalized
+
+        # Move up to parent
+        current = current.parent
+
+    return None
+
+
 def parse_crafting(html_content: str) -> List[Transformation]:
     """
     Parse crafting recipes from HTML content.
@@ -232,6 +270,9 @@ def parse_crafting(html_content: str) -> List[Transformation]:
         if not output_items:
             continue
 
+        # Extract category from DOM context
+        category = extract_category_from_element(ui)
+
         # If there are alternatives, create separate transformations for each
         if has_alternatives and alternative_slots:
             # Check if output also has alternatives (multiple items in output slot)
@@ -279,11 +320,14 @@ def parse_crafting(html_content: str) -> List[Transformation]:
                                 # Slot has fewer items: cycle using modulo
                                 paired_inputs.append(slot[output_idx % len(slot)])
 
+                        metadata = {"has_alternatives": True}
+                        if category:
+                            metadata["category"] = category
                         transformation = Transformation(
                             transformation_type=TransformationType.CRAFTING,
                             inputs=input_items + paired_inputs,
                             outputs=[output_item],
-                            metadata={"has_alternatives": True},
+                            metadata=metadata,
                         )
                         sig = transformation.get_signature()
                         if sig not in seen_signatures:
@@ -301,11 +345,14 @@ def parse_crafting(html_content: str) -> List[Transformation]:
                         else:
                             output = [output_items[0]]
 
+                        metadata = {"has_alternatives": True}
+                        if category:
+                            metadata["category"] = category
                         transformation = Transformation(
                             transformation_type=TransformationType.CRAFTING,
                             inputs=all_inputs,
                             outputs=output,
-                            metadata={"has_alternatives": True},
+                            metadata=metadata,
                         )
                         sig = transformation.get_signature()
                         if sig not in seen_signatures:
@@ -315,11 +362,14 @@ def parse_crafting(html_content: str) -> List[Transformation]:
             elif has_output_alternatives and first_slot_count == len(output_items):
                 for i, alt_item in enumerate(alternative_slots[0]):
                     all_inputs = input_items + [alt_item]
+                    metadata = {"has_alternatives": True}
+                    if category:
+                        metadata["category"] = category
                     transformation = Transformation(
                         transformation_type=TransformationType.CRAFTING,
                         inputs=all_inputs,
                         outputs=[output_items[i]],  # Match by index
-                        metadata={"has_alternatives": True},
+                        metadata=metadata,
                     )
                     # Only add if not seen before
                     sig = transformation.get_signature()
@@ -331,11 +381,14 @@ def parse_crafting(html_content: str) -> List[Transformation]:
                 # Create one transformation per input alternative with same output
                 for alt_item in alternative_slots[0]:
                     all_inputs = input_items + [alt_item]
+                    metadata = {"has_alternatives": True}
+                    if category:
+                        metadata["category"] = category
                     transformation = Transformation(
                         transformation_type=TransformationType.CRAFTING,
                         inputs=all_inputs,
                         outputs=[output_items[0]],  # Use first (only) output
-                        metadata={"has_alternatives": True},
+                        metadata=metadata,
                     )
                     # Only add if not seen before
                     sig = transformation.get_signature()
@@ -343,10 +396,14 @@ def parse_crafting(html_content: str) -> List[Transformation]:
                         seen_signatures.add(sig)
                         transformations.append(transformation)
         elif input_items:
+            metadata = {}
+            if category:
+                metadata["category"] = category
             transformation = Transformation(
                 transformation_type=TransformationType.CRAFTING,
                 inputs=input_items,
                 outputs=[output_items[0]],  # Always use single output
+                metadata=metadata,
             )
             # Only add if not seen before
             sig = transformation.get_signature()

@@ -412,3 +412,325 @@ class TestParsers:
         assert len(result) == 1
         assert result[0].inputs[0].name == "Iron Ingot"
         assert result[0].outputs[0].name == "Block of Iron"
+
+    def test_parse_crafting_includes_category_simple_recipe(self):
+        """Test that parse_crafting includes category metadata for simple recipes."""
+        from src.core.parsers import parse_crafting
+
+        html = '''
+        <html><body>
+        <h2><span class="mw-headline" id="Building_blocks">Building blocks</span></h2>
+        <table class="wikitable">
+            <tr>
+                <td>
+                    <span class="mcui mcui-Crafting_Table pixel-image">
+                        <span class="mcui-input">
+                            <span class="mcui-row">
+                                <span class="invslot">
+                                    <span class="invslot-item">
+                                        <a href="/w/Iron_Ingot" title="Iron Ingot">Iron Ingot</a>
+                                    </span>
+                                </span>
+                                <span class="invslot">
+                                    <span class="invslot-item">
+                                        <a href="/w/Iron_Ingot" title="Iron Ingot">Iron Ingot</a>
+                                    </span>
+                                </span>
+                                <span class="invslot">
+                                    <span class="invslot-item">
+                                        <a href="/w/Iron_Ingot" title="Iron Ingot">Iron Ingot</a>
+                                    </span>
+                                </span>
+                            </span>
+                            <span class="mcui-row">
+                                <span class="invslot">
+                                    <span class="invslot-item">
+                                        <a href="/w/Iron_Ingot" title="Iron Ingot">Iron Ingot</a>
+                                    </span>
+                                </span>
+                                <span class="invslot">
+                                    <span class="invslot-item">
+                                        <a href="/w/Iron_Ingot" title="Iron Ingot">Iron Ingot</a>
+                                    </span>
+                                </span>
+                                <span class="invslot">
+                                    <span class="invslot-item">
+                                        <a href="/w/Iron_Ingot" title="Iron Ingot">Iron Ingot</a>
+                                    </span>
+                                </span>
+                            </span>
+                            <span class="mcui-row">
+                                <span class="invslot">
+                                    <span class="invslot-item">
+                                        <a href="/w/Iron_Ingot" title="Iron Ingot">Iron Ingot</a>
+                                    </span>
+                                </span>
+                                <span class="invslot">
+                                    <span class="invslot-item">
+                                        <a href="/w/Iron_Ingot" title="Iron Ingot">Iron Ingot</a>
+                                    </span>
+                                </span>
+                                <span class="invslot">
+                                    <span class="invslot-item">
+                                        <a href="/w/Iron_Ingot" title="Iron Ingot">Iron Ingot</a>
+                                    </span>
+                                </span>
+                            </span>
+                        </span>
+                        <span class="mcui-arrow"></span>
+                        <span class="mcui-output">
+                            <span class="invslot invslot-large">
+                                <span class="invslot-item">
+                                    <a href="/w/Block_of_Iron" title="Block of Iron">Block of Iron</a>
+                                </span>
+                            </span>
+                        </span>
+                    </span>
+                </td>
+            </tr>
+        </table>
+        </body></html>
+        '''
+
+        result = parse_crafting(html)
+
+        assert len(result) == 1
+        assert result[0].metadata.get("category") == "building_blocks"
+
+    def test_parse_crafting_includes_category_with_alternatives(self):
+        """Test that parse_crafting includes category metadata for recipes with alternatives."""
+        from src.core.parsers import parse_crafting
+
+        html = '''
+        <html><body>
+        <h2><span class="mw-headline" id="Redstone">Redstone</span></h2>
+        <table class="wikitable">
+            <tr>
+                <td>
+                    <span class="mcui mcui-Crafting_Table pixel-image">
+                        <span class="mcui-input">
+                            <span class="mcui-row">
+                                <span class="invslot">
+                                    <span class="invslot-item">
+                                        <a href="/w/Redstone" title="Redstone">Redstone</a>
+                                    </span>
+                                </span>
+                                <span class="invslot">
+                                    <span class="invslot-item">
+                                        <a href="/w/Redstone" title="Redstone">Redstone</a>
+                                    </span>
+                                </span>
+                                <span class="invslot"></span>
+                            </span>
+                            <span class="mcui-row">
+                                <span class="invslot">
+                                    <span class="invslot-item">
+                                        <a href="/w/Stone" title="Stone">Stone</a>
+                                    </span>
+                                    <span class="invslot-item">
+                                        <a href="/w/Cobblestone" title="Cobblestone">Cobblestone</a>
+                                    </span>
+                                </span>
+                                <span class="invslot"></span>
+                                <span class="invslot"></span>
+                            </span>
+                            <span class="mcui-row">
+                                <span class="invslot"></span>
+                                <span class="invslot"></span>
+                                <span class="invslot"></span>
+                            </span>
+                        </span>
+                        <span class="mcui-arrow"></span>
+                        <span class="mcui-output">
+                            <span class="invslot invslot-large">
+                                <span class="invslot-item">
+                                    <a href="/w/Redstone_Repeater" title="Redstone Repeater">Repeater</a>
+                                </span>
+                            </span>
+                        </span>
+                    </span>
+                </td>
+            </tr>
+        </table>
+        </body></html>
+        '''
+
+        result = parse_crafting(html)
+
+        # Should have 2 transformations (one per stone alternative)
+        assert len(result) == 2
+        for transformation in result:
+            assert transformation.metadata.get("has_alternatives") is True
+            assert transformation.metadata.get("category") == "redstone"
+
+    def test_parse_crafting_no_category_without_heading(self):
+        """Test that parse_crafting handles recipes without section headings."""
+        from src.core.parsers import parse_crafting
+
+        html = '''
+        <html><body>
+        <table class="wikitable">
+            <tr>
+                <td>
+                    <span class="mcui mcui-Crafting_Table pixel-image">
+                        <span class="mcui-input">
+                            <span class="mcui-row">
+                                <span class="invslot">
+                                    <span class="invslot-item">
+                                        <a href="/w/Stick" title="Stick">Stick</a>
+                                    </span>
+                                </span>
+                                <span class="invslot"></span>
+                                <span class="invslot"></span>
+                            </span>
+                            <span class="mcui-row">
+                                <span class="invslot"></span>
+                                <span class="invslot"></span>
+                                <span class="invslot"></span>
+                            </span>
+                            <span class="mcui-row">
+                                <span class="invslot"></span>
+                                <span class="invslot"></span>
+                                <span class="invslot"></span>
+                            </span>
+                        </span>
+                        <span class="mcui-arrow"></span>
+                        <span class="mcui-output">
+                            <span class="invslot invslot-large">
+                                <span class="invslot-item">
+                                    <a href="/w/Torch" title="Torch">Torch</a>
+                                </span>
+                            </span>
+                        </span>
+                    </span>
+                </td>
+            </tr>
+        </table>
+        </body></html>
+        '''
+
+        result = parse_crafting(html)
+
+        assert len(result) == 1
+        # Category should not be present (or be None) when no heading is found
+        assert "category" not in result[0].metadata or result[0].metadata.get("category") is None
+
+    def test_parse_crafting_multiple_categories(self):
+        """Test that parse_crafting correctly assigns different categories to different recipes."""
+        from src.core.parsers import parse_crafting
+
+        html = '''
+        <html><body>
+        <h2><span class="mw-headline" id="Transportation">Transportation</span></h2>
+        <table class="wikitable">
+            <tr>
+                <td>
+                    <span class="mcui mcui-Crafting_Table pixel-image">
+                        <span class="mcui-input">
+                            <span class="mcui-row">
+                                <span class="invslot">
+                                    <span class="invslot-item">
+                                        <a href="/w/Iron_Ingot" title="Iron Ingot">Iron Ingot</a>
+                                    </span>
+                                </span>
+                                <span class="invslot"></span>
+                                <span class="invslot">
+                                    <span class="invslot-item">
+                                        <a href="/w/Iron_Ingot" title="Iron Ingot">Iron Ingot</a>
+                                    </span>
+                                </span>
+                            </span>
+                            <span class="mcui-row">
+                                <span class="invslot">
+                                    <span class="invslot-item">
+                                        <a href="/w/Iron_Ingot" title="Iron Ingot">Iron Ingot</a>
+                                    </span>
+                                </span>
+                                <span class="invslot">
+                                    <span class="invslot-item">
+                                        <a href="/w/Iron_Ingot" title="Iron Ingot">Iron Ingot</a>
+                                    </span>
+                                </span>
+                                <span class="invslot">
+                                    <span class="invslot-item">
+                                        <a href="/w/Iron_Ingot" title="Iron Ingot">Iron Ingot</a>
+                                    </span>
+                                </span>
+                            </span>
+                            <span class="mcui-row">
+                                <span class="invslot"></span>
+                                <span class="invslot"></span>
+                                <span class="invslot"></span>
+                            </span>
+                        </span>
+                        <span class="mcui-arrow"></span>
+                        <span class="mcui-output">
+                            <span class="invslot invslot-large">
+                                <span class="invslot-item">
+                                    <a href="/w/Minecart" title="Minecart">Minecart</a>
+                                </span>
+                            </span>
+                        </span>
+                    </span>
+                </td>
+            </tr>
+        </table>
+        <h2><span class="mw-headline" id="Combat">Combat</span></h2>
+        <table class="wikitable">
+            <tr>
+                <td>
+                    <span class="mcui mcui-Crafting_Table pixel-image">
+                        <span class="mcui-input">
+                            <span class="mcui-row">
+                                <span class="invslot"></span>
+                                <span class="invslot">
+                                    <span class="invslot-item">
+                                        <a href="/w/Iron_Ingot" title="Iron Ingot">Iron Ingot</a>
+                                    </span>
+                                </span>
+                                <span class="invslot"></span>
+                            </span>
+                            <span class="mcui-row">
+                                <span class="invslot"></span>
+                                <span class="invslot">
+                                    <span class="invslot-item">
+                                        <a href="/w/Stick" title="Stick">Stick</a>
+                                    </span>
+                                </span>
+                                <span class="invslot"></span>
+                            </span>
+                            <span class="mcui-row">
+                                <span class="invslot"></span>
+                                <span class="invslot">
+                                    <span class="invslot-item">
+                                        <a href="/w/Stick" title="Stick">Stick</a>
+                                    </span>
+                                </span>
+                                <span class="invslot"></span>
+                            </span>
+                        </span>
+                        <span class="mcui-arrow"></span>
+                        <span class="mcui-output">
+                            <span class="invslot invslot-large">
+                                <span class="invslot-item">
+                                    <a href="/w/Iron_Sword" title="Iron Sword">Iron Sword</a>
+                                </span>
+                            </span>
+                        </span>
+                    </span>
+                </td>
+            </tr>
+        </table>
+        </body></html>
+        '''
+
+        result = parse_crafting(html)
+
+        assert len(result) == 2
+
+        # Find the minecart and sword transformations
+        minecart = next(t for t in result if t.outputs[0].name == "Minecart")
+        sword = next(t for t in result if t.outputs[0].name == "Iron Sword")
+
+        assert minecart.metadata.get("category") == "transportation"
+        assert sword.metadata.get("category") == "combat"
