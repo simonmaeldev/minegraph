@@ -1,6 +1,7 @@
 """Module for downloading Minecraft Wiki pages."""
 
 import os
+import time
 from pathlib import Path
 from typing import Dict
 import requests
@@ -120,8 +121,12 @@ def download_page(page_name: str, url: str, output_dir: str) -> str:
     # Download the page
     print(f"Downloading {page_name} from {url}...")
     headers = {
-        "User-Agent": "Mozilla/5.0 (compatible; MinecraftDataExtractor/1.0)"
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0"
     }
+
+    # Add delay to respect rate limits (2 seconds between requests)
+    time.sleep(2)
+
     response = requests.get(url, headers=headers, timeout=30)
     response.raise_for_status()
 
@@ -130,6 +135,28 @@ def download_page(page_name: str, url: str, output_dir: str) -> str:
     print(f"Saved to: {output_path}")
 
     return str(output_path)
+
+
+def download_crafting_subcategory(url: str, output_dir: str) -> str:
+    """
+    Download a crafting subcategory page (e.g., Crafting/Building_blocks).
+
+    Args:
+        url: Full URL to the subcategory page (e.g., https://minecraft.wiki/w/Crafting/Building_blocks)
+        output_dir: Directory to save the file in
+
+    Returns:
+        Path to the downloaded or cached file
+    """
+    # Extract page reference from URL (e.g., "Crafting/Building_blocks")
+    # URL format: https://minecraft.wiki/w/Crafting/Building_blocks
+    page_ref = url.replace("https://minecraft.wiki/w/", "")
+
+    # Create filename: crafting_building_blocks.html
+    # Replace / with _ and convert to lowercase
+    filename = page_ref.replace("/", "_").lower()
+
+    return download_page(filename, url, output_dir)
 
 
 def download_all_pages(output_dir: str = "ai_doc/downloaded_pages") -> None:

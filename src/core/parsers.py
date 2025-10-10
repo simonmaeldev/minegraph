@@ -30,6 +30,20 @@ def is_java_edition(element: Tag) -> bool:
         if "bedrock edition" in parent_text and "java edition" not in parent_text:
             return False
 
+    # Check sibling table cells in the same table row for edition markers
+    # This catches cases where edition markers are in description columns
+    table_row = element.find_parent("tr")
+    if table_row:
+        # Get all table cells in this row
+        cells = table_row.find_all("td")
+        for cell in cells:
+            cell_text = cell.get_text().lower()
+            # Check if this cell contains Bedrock/Education edition markers
+            # Look for both "bedrock" and "education" together
+            if ("bedrock edition" in cell_text or "bedrock" in cell_text) and \
+               ("education" in cell_text or "minecraft education" in cell_text):
+                return False
+
     return True
 
 
@@ -121,10 +135,11 @@ def parse_crafting(html_content: str) -> List[Transformation]:
         html_content: HTML content from crafting wiki page
 
     Returns:
-        List of Transformation objects for crafting recipes
+        List of Transformation objects for crafting recipes (deduplicated)
     """
     soup = BeautifulSoup(html_content, "lxml")
     transformations: List[Transformation] = []
+    seen_signatures = set()
 
     # Find all crafting table UI elements
     crafting_uis = soup.find_all("span", class_=re.compile(r"mcui.*Crafting.*Table"))
@@ -166,26 +181,125 @@ def parse_crafting(html_content: str) -> List[Transformation]:
 
         # If there are alternatives, create separate transformations for each
         if has_alternatives and alternative_slots:
-            # For simplicity, create transformation for each alternative in first slot
-            # More complex logic would handle all combinations
-            for alt_item in alternative_slots[0]:
-                all_inputs = input_items + [alt_item]
-                transformations.append(
-                    Transformation(
+            # Check if output also has alternatives (multiple items in output slot)
+            has_output_alternatives = len(output_items) > 1
+
+            # Check if all alternative slots have the same count (for pairing)
+            all_counts_match = len(set(len(slot) for slot in alternative_slots)) == 1
+            first_slot_count = len(alternative_slots[0])
+
+            # Check if output count matches any alternative slot count (for guided pairing)
+            output_count = len(output_items)
+            output_matches_slot = has_output_alternatives and any(
+                len(slot) == output_count for slot in alternative_slots
+            )
+
+            # When multiple alternative slots exist and output provides guidance OR counts match
+            # Example: [wool colors] + [dye colors] → pairs like (white wool, white dye)
+            # Also handles: [17 shulker boxes] + [16 dyes] → 16 outputs (use output count as guide)
+            if len(alternative_slots) >= 2 and (all_counts_match or output_matches_slot):
+                # When output provides guidance, iterate by output items to ensure correct pairing
+                if has_output_alternatives and output_matches_slot:
+                    for output_idx, output_item in enumerate(output_items):
+                        # For each alternative slot, find the matching item by index
+                        # If a slot has fewer items than output, use modulo; if more, try to find match
+                        paired_inputs = []
+                        for slot in alternative_slots:
+                            if len(slot) == len(output_items):
+                                # Exact match: use same index
+                                paired_inputs.append(slot[output_idx])
+                            elif len(slot) > len(output_items):
+                                # Slot has extra items: try to find item matching output by name
+                                # or use offset index (skip first items that don't match pattern)
+                                matching_item = None
+                                for item in slot:
+                                    if item.name == output_item.name:
+                                        matching_item = item
+                                        break
+                                if matching_item:
+                                    paired_inputs.append(matching_item)
+                                else:
+                                    # Fallback: use index+1 to skip potential base item at index 0
+                                    idx = min(output_idx + 1, len(slot) - 1)
+                                    paired_inputs.append(slot[idx])
+                            else:
+                                # Slot has fewer items: cycle using modulo
+                                paired_inputs.append(slot[output_idx % len(slot)])
+
+                        transformation = Transformation(
+                            transformation_type=TransformationType.CRAFTING,
+                            inputs=input_items + paired_inputs,
+                            outputs=[output_item],
+                            metadata={"has_alternatives": True},
+                        )
+                        sig = transformation.get_signature()
+                        if sig not in seen_signatures:
+                            seen_signatures.add(sig)
+                            transformations.append(transformation)
+                else:
+                    # All counts match: simple zip pairing
+                    for alt_items_tuple in zip(*alternative_slots):
+                        all_inputs = input_items + list(alt_items_tuple)
+
+                        # Determine output by index
+                        if has_output_alternatives and first_slot_count == len(output_items):
+                            output_idx = alternative_slots[0].index(alt_items_tuple[0])
+                            output = [output_items[output_idx]]
+                        else:
+                            output = [output_items[0]]
+
+                        transformation = Transformation(
+                            transformation_type=TransformationType.CRAFTING,
+                            inputs=all_inputs,
+                            outputs=output,
+                            metadata={"has_alternatives": True},
+                        )
+                        sig = transformation.get_signature()
+                        if sig not in seen_signatures:
+                            seen_signatures.add(sig)
+                            transformations.append(transformation)
+            # When both input and output have same number of alternatives, pair them by index
+            elif has_output_alternatives and first_slot_count == len(output_items):
+                for i, alt_item in enumerate(alternative_slots[0]):
+                    all_inputs = input_items + [alt_item]
+                    transformation = Transformation(
                         transformation_type=TransformationType.CRAFTING,
                         inputs=all_inputs,
-                        outputs=output_items,
+                        outputs=[output_items[i]],  # Match by index
                         metadata={"has_alternatives": True},
                     )
-                )
+                    # Only add if not seen before
+                    sig = transformation.get_signature()
+                    if sig not in seen_signatures:
+                        seen_signatures.add(sig)
+                        transformations.append(transformation)
+            else:
+                # Input has alternatives but output is single or different count
+                # Create one transformation per input alternative with same output
+                for alt_item in alternative_slots[0]:
+                    all_inputs = input_items + [alt_item]
+                    transformation = Transformation(
+                        transformation_type=TransformationType.CRAFTING,
+                        inputs=all_inputs,
+                        outputs=[output_items[0]],  # Use first (only) output
+                        metadata={"has_alternatives": True},
+                    )
+                    # Only add if not seen before
+                    sig = transformation.get_signature()
+                    if sig not in seen_signatures:
+                        seen_signatures.add(sig)
+                        transformations.append(transformation)
         elif input_items:
-            transformations.append(
-                Transformation(
-                    transformation_type=TransformationType.CRAFTING,
-                    inputs=input_items,
-                    outputs=output_items,
-                )
+            transformation = Transformation(
+                transformation_type=TransformationType.CRAFTING,
+                inputs=input_items,
+                outputs=[output_items[0]],  # Always use single output
             )
+            # Only add if not seen before
+            sig = transformation.get_signature()
+            if sig not in seen_signatures:
+                seen_signatures.add(sig)
+                transformations.append(transformation)
 
     return transformations
 
@@ -257,10 +371,11 @@ def parse_smithing(html_content: str) -> List[Transformation]:
         html_content: HTML content from smithing wiki page
 
     Returns:
-        List of Transformation objects for smithing recipes
+        List of Transformation objects for smithing recipes (deduplicated)
     """
     soup = BeautifulSoup(html_content, "lxml")
     transformations: List[Transformation] = []
+    seen_signatures = set()
 
     # Find all smithing table UI elements
     smithing_uis = soup.find_all("span", class_=re.compile(r"mcui.*Smithing.*Table"))
@@ -290,13 +405,16 @@ def parse_smithing(html_content: str) -> List[Transformation]:
         output_items = find_item_in_slot(output_section)
 
         if len(inputs) >= 2 and output_items:  # At least 2 inputs required
-            transformations.append(
-                Transformation(
-                    transformation_type=TransformationType.SMITHING,
-                    inputs=inputs,
-                    outputs=output_items,
-                )
+            transformation = Transformation(
+                transformation_type=TransformationType.SMITHING,
+                inputs=inputs,
+                outputs=[output_items[0]],  # Always use single output
             )
+            # Only add if not seen before
+            sig = transformation.get_signature()
+            if sig not in seen_signatures:
+                seen_signatures.add(sig)
+                transformations.append(transformation)
 
     return transformations
 
@@ -309,10 +427,11 @@ def parse_stonecutter(html_content: str) -> List[Transformation]:
         html_content: HTML content from stonecutter wiki page
 
     Returns:
-        List of Transformation objects for stonecutter recipes
+        List of Transformation objects for stonecutter recipes (deduplicated)
     """
     soup = BeautifulSoup(html_content, "lxml")
     transformations: List[Transformation] = []
+    seen_signatures = set()
 
     # Find stonecutter UI elements
     stonecutter_uis = soup.find_all("span", class_=re.compile(r"mcui.*Stonecutter"))
@@ -336,13 +455,19 @@ def parse_stonecutter(html_content: str) -> List[Transformation]:
         output_items = find_item_in_slot(output_section)
 
         if input_items and output_items:
-            transformations.append(
-                Transformation(
+            # Stonecutter can have multiple outputs (different items from same input)
+            # Create separate transformation for each output
+            for output_item in output_items:
+                transformation = Transformation(
                     transformation_type=TransformationType.STONECUTTER,
                     inputs=input_items,
-                    outputs=output_items,
+                    outputs=[output_item],  # Single output per transformation
                 )
-            )
+                # Only add if not seen before
+                sig = transformation.get_signature()
+                if sig not in seen_signatures:
+                    seen_signatures.add(sig)
+                    transformations.append(transformation)
 
     return transformations
 
@@ -437,7 +562,7 @@ def parse_trading(html_content: str) -> List[Transformation]:
                     Transformation(
                         transformation_type=TransformationType.TRADING,
                         inputs=input_items,
-                        outputs=output_items,
+                        outputs=[output_items[0]],  # Always use single output
                         metadata={
                             "villager_type": villager_type,
                             "level": level,
@@ -457,10 +582,11 @@ def parse_mob_drops(html_content: str, mob_name: str) -> List[Transformation]:
         mob_name: Name of the mob
 
     Returns:
-        List of Transformation objects for mob drops
+        List of Transformation objects for mob drops (deduplicated)
     """
     soup = BeautifulSoup(html_content, "lxml")
     transformations: List[Transformation] = []
+    seen_signatures = set()
 
     # Find "Drops" section
     drops_section = soup.find(id="Drops")
@@ -510,14 +636,17 @@ def parse_mob_drops(html_content: str, mob_name: str) -> List[Transformation]:
                         except ValueError:
                             pass
 
-                transformations.append(
-                    Transformation(
-                        transformation_type=TransformationType.MOB_DROP,
-                        inputs=[mob_item],
-                        outputs=[item],
-                        metadata={"probability": probability},
-                    )
+                transformation = Transformation(
+                    transformation_type=TransformationType.MOB_DROP,
+                    inputs=[mob_item],
+                    outputs=[item],
+                    metadata={"probability": probability},
                 )
+                # Only add if not seen before
+                sig = transformation.get_signature()
+                if sig not in seen_signatures:
+                    seen_signatures.add(sig)
+                    transformations.append(transformation)
 
     return transformations
 
@@ -530,10 +659,11 @@ def parse_brewing(html_content: str) -> List[Transformation]:
         html_content: HTML content from brewing wiki page
 
     Returns:
-        List of Transformation objects for brewing recipes
+        List of Transformation objects for brewing recipes (deduplicated)
     """
     soup = BeautifulSoup(html_content, "lxml")
     transformations: List[Transformation] = []
+    seen_signatures = set()
 
     # Find brewing stand UI elements
     brewing_uis = soup.find_all("span", class_=re.compile(r"mcui.*Brewing.*Stand"))
@@ -569,13 +699,16 @@ def parse_brewing(html_content: str) -> List[Transformation]:
         all_inputs = base_items + ingredient_items
 
         if all_inputs and output_items:
-            transformations.append(
-                Transformation(
-                    transformation_type=TransformationType.BREWING,
-                    inputs=all_inputs,
-                    outputs=output_items,
-                )
+            transformation = Transformation(
+                transformation_type=TransformationType.BREWING,
+                inputs=all_inputs,
+                outputs=[output_items[0]],  # Always use single output
             )
+            # Only add if not seen before
+            sig = transformation.get_signature()
+            if sig not in seen_signatures:
+                seen_signatures.add(sig)
+                transformations.append(transformation)
 
     return transformations
 
@@ -588,10 +721,11 @@ def parse_composting(html_content: str) -> List[Transformation]:
         html_content: HTML content from composter wiki page
 
     Returns:
-        List of Transformation objects for composting recipes
+        List of Transformation objects for composting recipes (deduplicated)
     """
     soup = BeautifulSoup(html_content, "lxml")
     transformations: List[Transformation] = []
+    seen_signatures = set()
 
     # Find composting tables
     tables = soup.find_all("table", class_="wikitable")
@@ -639,14 +773,17 @@ def parse_composting(html_content: str) -> List[Transformation]:
                             except ValueError:
                                 pass
 
-                    transformations.append(
-                        Transformation(
-                            transformation_type=TransformationType.COMPOSTING,
-                            inputs=[item],
-                            outputs=[bone_meal],
-                            metadata={"success_rate": success_rate},
-                        )
+                    transformation = Transformation(
+                        transformation_type=TransformationType.COMPOSTING,
+                        inputs=[item],
+                        outputs=[bone_meal],
+                        metadata={"success_rate": success_rate},
                     )
+                    # Only add if not seen before
+                    sig = transformation.get_signature()
+                    if sig not in seen_signatures:
+                        seen_signatures.add(sig)
+                        transformations.append(transformation)
 
     return transformations
 
@@ -691,7 +828,7 @@ def parse_grindstone(html_content: str) -> List[Transformation]:
                 Transformation(
                     transformation_type=TransformationType.GRINDSTONE,
                     inputs=input_items,
-                    outputs=output_items,
+                    outputs=[output_items[0]],  # Always use single output
                 )
             )
 

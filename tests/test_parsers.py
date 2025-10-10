@@ -42,6 +42,42 @@ class TestIsJavaEdition:
         element = soup.find("div")
         assert is_java_edition(element) is True
 
+    def test_rejects_bedrock_education_in_table_row(self):
+        """Test that Bedrock/Education markers in sibling table cells are detected."""
+        html = '''
+        <table>
+            <tr>
+                <td>
+                    <span class="mcui mcui-Crafting_Table">Recipe UI</span>
+                </td>
+                <td>
+                    <sup>[<i><span title="This statement only applies to Bedrock Edition and Minecraft Education">
+                    <a href="/w/Bedrock_Edition">Bedrock Edition</a> and
+                    <a href="/w/Minecraft_Education">Minecraft Education</a> only</span></i>]</sup>
+                </td>
+            </tr>
+        </table>
+        '''
+        soup = BeautifulSoup(html, "lxml")
+        element = soup.find("span", class_="mcui")
+        assert is_java_edition(element) is False
+
+    def test_accepts_java_edition_in_table_row(self):
+        """Test that Java Edition recipes in table rows are accepted."""
+        html = '''
+        <table>
+            <tr>
+                <td>
+                    <span class="mcui mcui-Crafting_Table">Recipe UI</span>
+                </td>
+                <td>Regular crafting recipe description</td>
+            </tr>
+        </table>
+        '''
+        soup = BeautifulSoup(html, "lxml")
+        element = soup.find("span", class_="mcui")
+        assert is_java_edition(element) is True
+
 
 class TestExtractItemFromLink:
     """Tests for extract_item_from_link function."""
@@ -226,3 +262,153 @@ class TestParsers:
         result = parse_mob_drops(empty_html, "Zombie")
 
         assert isinstance(result, list)
+
+    def test_filter_bedrock_education_recipes(self):
+        """Test that parse_crafting filters out Bedrock/Education recipes like Bleach."""
+        from src.core.parsers import parse_crafting
+
+        # HTML that mimics the wiki structure for Bleach recipe
+        html = '''
+        <html><body>
+        <table class="wikitable">
+            <tr>
+                <td>
+                    <span class="mcui mcui-Crafting_Table pixel-image">
+                        <span class="mcui-input">
+                            <span class="mcui-row">
+                                <span class="invslot"></span>
+                                <span class="invslot"></span>
+                                <span class="invslot"></span>
+                            </span>
+                            <span class="mcui-row">
+                                <span class="invslot">
+                                    <span class="invslot-item">
+                                        <a href="/w/Gray_Wool" title="Gray Wool">Gray Wool</a>
+                                    </span>
+                                </span>
+                                <span class="invslot">
+                                    <span class="invslot-item">
+                                        <a href="/w/Bleach" title="Bleach">Bleach</a>
+                                    </span>
+                                </span>
+                                <span class="invslot"></span>
+                            </span>
+                            <span class="mcui-row">
+                                <span class="invslot"></span>
+                                <span class="invslot"></span>
+                                <span class="invslot"></span>
+                            </span>
+                        </span>
+                        <span class="mcui-arrow"></span>
+                        <span class="mcui-output">
+                            <span class="invslot invslot-large">
+                                <span class="invslot-item">
+                                    <a href="/w/White_Wool" title="White Wool">White Wool</a>
+                                </span>
+                            </span>
+                        </span>
+                    </span>
+                </td>
+                <td>
+                    <sup class="nowrap Inline-Template">
+                        [<i><span title="This statement only applies to Bedrock Edition and Minecraft Education">
+                        <a href="/w/Bedrock_Edition">Bedrock Edition</a> and
+                        <a href="/w/Minecraft_Education">Minecraft Education</a> only</span></i>]
+                    </sup>
+                </td>
+            </tr>
+        </table>
+        </body></html>
+        '''
+
+        result = parse_crafting(html)
+
+        # The Bedrock/Education recipe should be filtered out
+        assert len(result) == 0
+
+    def test_accept_java_edition_recipes(self):
+        """Test that parse_crafting accepts Java Edition recipes."""
+        from src.core.parsers import parse_crafting
+
+        # HTML that mimics a standard Java Edition crafting recipe
+        html = '''
+        <html><body>
+        <table class="wikitable">
+            <tr>
+                <td>
+                    <span class="mcui mcui-Crafting_Table pixel-image">
+                        <span class="mcui-input">
+                            <span class="mcui-row">
+                                <span class="invslot">
+                                    <span class="invslot-item">
+                                        <a href="/w/Iron_Ingot" title="Iron Ingot">Iron Ingot</a>
+                                    </span>
+                                </span>
+                                <span class="invslot">
+                                    <span class="invslot-item">
+                                        <a href="/w/Iron_Ingot" title="Iron Ingot">Iron Ingot</a>
+                                    </span>
+                                </span>
+                                <span class="invslot">
+                                    <span class="invslot-item">
+                                        <a href="/w/Iron_Ingot" title="Iron Ingot">Iron Ingot</a>
+                                    </span>
+                                </span>
+                            </span>
+                            <span class="mcui-row">
+                                <span class="invslot">
+                                    <span class="invslot-item">
+                                        <a href="/w/Iron_Ingot" title="Iron Ingot">Iron Ingot</a>
+                                    </span>
+                                </span>
+                                <span class="invslot">
+                                    <span class="invslot-item">
+                                        <a href="/w/Iron_Ingot" title="Iron Ingot">Iron Ingot</a>
+                                    </span>
+                                </span>
+                                <span class="invslot">
+                                    <span class="invslot-item">
+                                        <a href="/w/Iron_Ingot" title="Iron Ingot">Iron Ingot</a>
+                                    </span>
+                                </span>
+                            </span>
+                            <span class="mcui-row">
+                                <span class="invslot">
+                                    <span class="invslot-item">
+                                        <a href="/w/Iron_Ingot" title="Iron Ingot">Iron Ingot</a>
+                                    </span>
+                                </span>
+                                <span class="invslot">
+                                    <span class="invslot-item">
+                                        <a href="/w/Iron_Ingot" title="Iron Ingot">Iron Ingot</a>
+                                    </span>
+                                </span>
+                                <span class="invslot">
+                                    <span class="invslot-item">
+                                        <a href="/w/Iron_Ingot" title="Iron Ingot">Iron Ingot</a>
+                                    </span>
+                                </span>
+                            </span>
+                        </span>
+                        <span class="mcui-arrow"></span>
+                        <span class="mcui-output">
+                            <span class="invslot invslot-large">
+                                <span class="invslot-item">
+                                    <a href="/w/Block_of_Iron" title="Block of Iron">Block of Iron</a>
+                                </span>
+                            </span>
+                        </span>
+                    </span>
+                </td>
+                <td>Normal crafting recipe</td>
+            </tr>
+        </table>
+        </body></html>
+        '''
+
+        result = parse_crafting(html)
+
+        # Java Edition recipe should be accepted
+        assert len(result) == 1
+        assert result[0].inputs[0].name == "Iron Ingot"
+        assert result[0].outputs[0].name == "Block of Iron"

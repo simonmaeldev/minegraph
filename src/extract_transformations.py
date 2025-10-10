@@ -20,6 +20,8 @@ from core.parsers import (
     parse_composting,
     parse_grindstone,
 )
+from core.lazy_load_detector import find_lazy_load_pages
+from core.download_data import download_crafting_subcategory
 
 # Configure logging
 logging.basicConfig(
@@ -73,9 +75,41 @@ def extract_all_transformations(data_dir: str = "ai_doc/downloaded_pages") -> Li
             logger.info(f"Parsing {filename}...")
             try:
                 html_content = load_html_file(filepath)
-                results = parser_func(html_content)
-                transformations.extend(results)
-                logger.info(f"  Found {len(results)} transformations")
+
+                # Special handling for crafting.html to extract lazy-loaded subcategories
+                if filename == "crafting.html":
+                    # Parse main crafting page
+                    results = parser_func(html_content)
+                    transformations.extend(results)
+                    logger.info(f"  Found {len(results)} transformations from main page")
+
+                    # Detect lazy-load subcategories
+                    subcategory_urls = find_lazy_load_pages(html_content)
+                    logger.info(f"  Detected {len(subcategory_urls)} lazy-load subcategories")
+
+                    # Download and parse each subcategory
+                    for url in subcategory_urls:
+                        try:
+                            # Extract category name for logging
+                            category_name = url.split("/")[-1].replace("_", " ")
+
+                            # Download subcategory page
+                            subcategory_path = download_crafting_subcategory(url, data_dir)
+
+                            # Parse subcategory page
+                            subcategory_html = load_html_file(subcategory_path)
+                            subcategory_results = parser_func(subcategory_html)
+                            transformations.extend(subcategory_results)
+
+                            if subcategory_results:
+                                logger.info(f"    {category_name}: {len(subcategory_results)} transformations")
+                        except Exception as e:
+                            logger.error(f"    Error processing {url}: {e}")
+                else:
+                    # Standard parsing for other transformation types
+                    results = parser_func(html_content)
+                    transformations.extend(results)
+                    logger.info(f"  Found {len(results)} transformations")
             except Exception as e:
                 logger.error(f"  Error parsing {filename}: {e}")
         else:

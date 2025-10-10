@@ -55,3 +55,20 @@ class Transformation:
             raise ValueError("Transformation must have at least one input")
         if not self.outputs:
             raise ValueError("Transformation must have at least one output")
+        if len(self.outputs) > 1:
+            raise ValueError(
+                f"Transformation must have exactly one output item, got {len(self.outputs)}: "
+                f"{[item.name for item in self.outputs]}"
+            )
+
+    def get_signature(self) -> tuple:
+        """
+        Get a hashable signature for this transformation for deduplication.
+
+        Returns:
+            Tuple containing transformation type, sorted input names, sorted output names, and metadata
+        """
+        input_names = tuple(sorted(item.name for item in self.inputs))
+        output_names = tuple(sorted(item.name for item in self.outputs))
+        metadata_tuple = tuple(sorted(self.metadata.items()))
+        return (self.transformation_type, input_names, output_names, metadata_tuple)
