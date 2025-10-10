@@ -6,6 +6,10 @@ from bs4 import BeautifulSoup, Tag
 from .data_models import Item, Transformation, TransformationType
 
 
+# Excluded sections for crafting parser (historical/obsolete recipes)
+EXCLUDED_CRAFTING_SECTIONS = {"Removed_recipes", "Changed_recipes"}
+
+
 def is_java_edition(element: Tag) -> bool:
     """
     Check if element is Java Edition content (filters out Bedrock/Education).
@@ -45,6 +49,51 @@ def is_java_edition(element: Tag) -> bool:
                 return False
 
     return True
+
+
+def is_in_excluded_section(element: Tag, excluded_ids: set = EXCLUDED_CRAFTING_SECTIONS) -> bool:
+    """
+    Check if element is within an excluded section (e.g., Removed_recipes, Changed_recipes).
+
+    Args:
+        element: BeautifulSoup Tag to check
+        excluded_ids: Set of section IDs to exclude (default: EXCLUDED_CRAFTING_SECTIONS)
+
+    Returns:
+        True if element is within an excluded section, False otherwise
+    """
+    # Traverse up the DOM tree looking for parent elements with excluded IDs
+    current = element
+    while current:
+        # Check if current element has an id attribute
+        element_id = current.get('id')
+        if element_id and element_id in excluded_ids:
+            return True
+
+        # Also check for child spans with mw-headline class (wiki heading structure)
+        # Pattern: <h3><span class="mw-headline" id="Removed_recipes">
+        if current.name in ['h2', 'h3', 'h4']:
+            headline = current.find('span', class_='mw-headline')
+            if headline:
+                headline_id = headline.get('id')
+                if headline_id and headline_id in excluded_ids:
+                    return True
+
+        # Check if we're past a heading with excluded ID
+        # Find previous siblings that are headings
+        for sibling in current.find_previous_siblings(['h2', 'h3']):
+            headline = sibling.find('span', class_='mw-headline')
+            if headline:
+                sibling_id = headline.get('id')
+                if sibling_id and sibling_id in excluded_ids:
+                    return True
+                # If we hit a non-excluded heading, we're in a different section
+                elif sibling_id:
+                    return False
+
+        current = current.parent
+
+    return False
 
 
 def extract_item_from_link(link_tag: Tag) -> Optional[Item]:
@@ -146,6 +195,10 @@ def parse_crafting(html_content: str) -> List[Transformation]:
 
     for ui in crafting_uis:
         if not is_java_edition(ui):
+            continue
+
+        # Skip recipes in excluded sections (Removed/Changed recipes)
+        if is_in_excluded_section(ui):
             continue
 
         # Extract inputs from mcui-input section
