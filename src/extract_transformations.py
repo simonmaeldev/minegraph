@@ -20,8 +20,6 @@ from core.parsers import (
     parse_composting,
     parse_grindstone,
 )
-from core.lazy_load_detector import find_lazy_load_pages
-from core.download_data import download_crafting_subcategory
 
 # Configure logging
 logging.basicConfig(
@@ -76,44 +74,36 @@ def extract_all_transformations(data_dir: str = "ai_doc/downloaded_pages") -> Li
             try:
                 html_content = load_html_file(filepath)
 
-                # Special handling for crafting.html to extract lazy-loaded subcategories
-                if filename == "crafting.html":
-                    # Parse main crafting page
-                    results = parser_func(html_content)
-                    transformations.extend(results)
-                    logger.info(f"  Found {len(results)} transformations from main page")
+                # Check if crafting.html might have lazy-loaded content
+                if filename == "crafting.html" and "load-page" in html_content:
+                    logger.warning("  ⚠️  WARNING: crafting.html contains lazy-loaded sections!")
+                    logger.warning("  To get complete data, please:")
+                    logger.warning("    1. Open https://minecraft.wiki/w/Crafting in your browser")
+                    logger.warning("    2. Scroll through the entire page to load all sections")
+                    logger.warning("    3. Open browser inspector (F12)")
+                    logger.warning("    4. Copy the full HTML from the <html> element")
+                    logger.warning("    5. Paste it into ai_doc/downloaded_pages/crafting.html")
+                    logger.warning("  Then re-run this extraction script.")
+                    logger.warning("")
 
-                    # Detect lazy-load subcategories
-                    subcategory_urls = find_lazy_load_pages(html_content)
-                    logger.info(f"  Detected {len(subcategory_urls)} lazy-load subcategories")
-
-                    # Download and parse each subcategory
-                    for url in subcategory_urls:
-                        try:
-                            # Extract category name for logging
-                            category_name = url.split("/")[-1].replace("_", " ")
-
-                            # Download subcategory page
-                            subcategory_path = download_crafting_subcategory(url, data_dir)
-
-                            # Parse subcategory page
-                            subcategory_html = load_html_file(subcategory_path)
-                            subcategory_results = parser_func(subcategory_html)
-                            transformations.extend(subcategory_results)
-
-                            if subcategory_results:
-                                logger.info(f"    {category_name}: {len(subcategory_results)} transformations")
-                        except Exception as e:
-                            logger.error(f"    Error processing {url}: {e}")
-                else:
-                    # Standard parsing for other transformation types
-                    results = parser_func(html_content)
-                    transformations.extend(results)
-                    logger.info(f"  Found {len(results)} transformations")
+                # Parse the page
+                results = parser_func(html_content)
+                transformations.extend(results)
+                logger.info(f"  Found {len(results)} transformations")
             except Exception as e:
                 logger.error(f"  Error parsing {filename}: {e}")
         else:
             logger.warning(f"  File not found: {filepath}")
+
+            # Special message for crafting.html
+            if filename == "crafting.html":
+                logger.warning("  To download crafting.html manually:")
+                logger.warning("    1. Open https://minecraft.wiki/w/Crafting in your browser")
+                logger.warning("    2. Scroll through the entire page to load all sections")
+                logger.warning("    3. Open browser inspector (F12)")
+                logger.warning("    4. Copy the full HTML from the <html> element")
+                logger.warning("    5. Save it to ai_doc/downloaded_pages/crafting.html")
+                logger.warning("")
 
     # Parse mob drop pages
     mob_dir = os.path.join(data_dir, "mobs")

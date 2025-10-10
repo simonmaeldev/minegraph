@@ -137,28 +137,6 @@ def download_page(page_name: str, url: str, output_dir: str) -> str:
     return str(output_path)
 
 
-def download_crafting_subcategory(url: str, output_dir: str) -> str:
-    """
-    Download a crafting subcategory page (e.g., Crafting/Building_blocks).
-
-    Args:
-        url: Full URL to the subcategory page (e.g., https://minecraft.wiki/w/Crafting/Building_blocks)
-        output_dir: Directory to save the file in
-
-    Returns:
-        Path to the downloaded or cached file
-    """
-    # Extract page reference from URL (e.g., "Crafting/Building_blocks")
-    # URL format: https://minecraft.wiki/w/Crafting/Building_blocks
-    page_ref = url.replace("https://minecraft.wiki/w/", "")
-
-    # Create filename: crafting_building_blocks.html
-    # Replace / with _ and convert to lowercase
-    filename = page_ref.replace("/", "_").lower()
-
-    return download_page(filename, url, output_dir)
-
-
 def download_all_pages(output_dir: str = "ai_doc/downloaded_pages") -> None:
     """
     Download all wiki pages needed for transformation extraction.
