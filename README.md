@@ -47,6 +47,12 @@ This project uses [uv](https://github.com/astral-sh/uv) for dependency managemen
    - lxml
    - requests
    - pytest
+   - graphviz
+
+4. **Install Graphviz system dependency** (required for visualization):
+   - **macOS**: `brew install graphviz`
+   - **Ubuntu/Debian**: `sudo apt-get install graphviz`
+   - **Windows**: Download from https://graphviz.org/download/
 
 ## Usage
 
@@ -80,6 +86,59 @@ uv run python src/validate_output.py
 ```
 
 This checks for duplicates, orphaned transformations, and reports statistics.
+
+### Visualize Transformation Graph
+
+Generate visual representations of the transformation graph using Graphviz:
+
+```bash
+# Generate default SVG graph from all transformations
+uv run python src/visualize_graph.py
+
+# Generate graph in PNG format
+uv run python src/visualize_graph.py -f png
+
+# Generate graph with custom output path
+uv run python src/visualize_graph.py -o output/graphs/my_graph
+
+# Filter by transformation type (e.g., only crafting)
+uv run python src/visualize_graph.py -t crafting -o output/graphs/crafting_only
+
+# Generate multiple formats at once
+uv run python src/visualize_graph.py -f png,svg,pdf
+
+# Show help for all options
+uv run python src/visualize_graph.py --help
+```
+
+**Command-line Options:**
+- `-i, --input`: Path to transformations CSV (default: `output/transformations.csv`)
+- `-c, --config`: Path to color config (default: `config/graph_colors.txt`)
+- `-o, --output`: Output file path without extension (default: `output/graphs/transformation_graph`)
+- `-f, --format`: Output format(s) - comma-separated: svg, png, pdf, dot (default: svg)
+- `-t, --filter-type`: Filter to only include specific transformation type
+- `-v, --verbose`: Enable verbose logging
+
+**Customizing Colors:**
+
+Edit `config/graph_colors.txt` to customize the colors for different transformation types:
+
+```
+# Example configuration
+crafting=#4A90E2
+smelting=#E67E22
+smithing=#95A5A6
+# ... etc
+```
+
+Colors can be hex codes (e.g., `#4A90E2`) or standard color names (e.g., `blue`).
+
+**Performance Note:**
+
+With 1961+ transformations, the full graph is very large and complex. For better readability:
+- Use the `-t` flag to filter by transformation type
+- Generate separate graphs per transformation type
+- View SVG files in a browser for pan/zoom capabilities
 
 ## Output Format
 

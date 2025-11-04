@@ -1,0 +1,33 @@
+# Graph Color Configuration for Transformation Types
+# Format: transformation_type=color
+# Colors can be hex codes (e.g., #4A90E2) or standard color names (e.g., blue)
+#
+# To customize the visualization, edit the color values below.
+# Each transformation type will use the specified color for all its edges.
+
+# Crafting transformations (crafting table recipes)
+crafting=#4A90E2
+
+# Smelting transformations (furnace, blast furnace, smoker)
+smelting=#E67E22
+
+# Smithing transformations (smithing table upgrades)
+smithing=#95A5A6
+
+# Stonecutter transformations (stonecutter recipes)
+stonecutter=#7F8C8D
+
+# Trading transformations (villager trades)
+trading=#F39C12
+
+# Mob drop transformations (items dropped by mobs)
+mob_drop=#E74C3C
+
+# Brewing transformations (brewing stand recipes)
+brewing=#9B59B6
+
+# Composting transformations (composter conversions)
+composting=#27AE60
+
+# Grindstone transformations (grindstone recipes)
+grindstone=#34495E
