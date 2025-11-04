@@ -24,6 +24,9 @@ Focus on the following files:
 - `app/**` - Contains the codebase client/server.
 - `scripts/**` - Contains the scripts to start and stop the server + client.
 
+- Read `.claude/commands/conditional_docs.md` to check if your task requires additional documentation
+- If your task matches any of the conditions listed, include those documentation files in the `Plan Format: Relevant Files` section of your plan
+
 Ignore all other files in the codebase.
 
 ## Plan Format

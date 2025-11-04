@@ -33,6 +33,9 @@ Focus on the following files:
 - `README.md` - Contains the project overview and instructions.
 - RELEVANT_FILES_COLLECTION : May contain prior knowledge, analysis etc.
 
+- Read `.claude/commands/conditional_docs.md` to check if your task requires additional documentation
+- If your task matches any of the conditions listed, include those documentation files in the `Plan Format: Relevant Files` section of your plan
+
 Ignore all other files in the codebase.
 
 ## Plan Format
