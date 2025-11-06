@@ -43,3 +43,25 @@ This prompt helps you determine what documentation you should read based on the 
     - When implementing filtering for graph visualization
     - When handling multi-input transformations in visualizations
 
+- app_docs/feature-1-3d-graph-visualization.md
+  - Conditions:
+    - When working with 3D graph visualization or NetworkX integration
+    - When implementing interactive visualizations using Matplotlib
+    - When working with spectral or spring layout algorithms
+    - When troubleshooting 3D rendering or layout computation issues
+    - When implementing node sizing based on degree centrality
+    - When handling multi-input transformations with intermediate nodes in 3D space
+    - When comparing 2D vs 3D visualization approaches
+    - When modifying src/visualize_graph_3d.py or tests/test_visualize_graph_3d.py
+
+- app_docs/feature-2-3d-graph-hover-interactivity.md
+  - Conditions:
+    - When implementing hover annotations or tooltips in matplotlib
+    - When working with matplotlib event handlers (motion_notify_event)
+    - When implementing interactive features in 3D scatter plots
+    - When troubleshooting hover detection or annotation positioning
+    - When adding numeric axis scales or tick configuration
+    - When working with matplotlib toolbar visibility
+    - When implementing hit testing with scatter plot contains() method
+    - When enhancing user interaction in 3D visualizations
+

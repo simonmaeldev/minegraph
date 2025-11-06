@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from src.visualize_graph import (
+from src.visualize_graph_with_graphviz import (
     TransformationGraphBuilder,
     generate_graph,
     load_color_config,
