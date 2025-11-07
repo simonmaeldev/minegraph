@@ -426,49 +426,104 @@ def parse_smelting(html_content: str) -> List[Transformation]:
     """
     soup = BeautifulSoup(html_content, "lxml")
     transformations: List[Transformation] = []
+    seen_signatures = set()
 
-    # Map furnace types to transformation types
-    furnace_types = {
-        "Furnace": TransformationType.SMELTING,
-        "Blast_Furnace": TransformationType.BLAST_FURNACE,
-        "Smoker": TransformationType.SMOKER,
-    }
+    # Find all wikitable tables with smelting recipes
+    tables = soup.find_all("table", class_="sortable wikitable")
 
-    for furnace_name, trans_type in furnace_types.items():
-        furnace_uis = soup.find_all("span", class_=re.compile(f"mcui.*{furnace_name}"))
+    for table in tables:
+        # Filter out Java Edition only
+        if not is_java_edition(table):
+            continue
 
-        for ui in furnace_uis:
-            if not is_java_edition(ui):
+        # Find table header row to locate column indices
+        header_row = table.find("tr")
+        if not header_row:
+            continue
+
+        # Find column headers
+        headers = header_row.find_all("th")
+        if not headers or len(headers) < 2:
+            continue
+
+        # Identify Product and Ingredient column indices
+        product_col = None
+        ingredient_col = None
+        for idx, header in enumerate(headers):
+            header_text = header.get_text().strip().lower()
+            if "product" in header_text:
+                product_col = idx
+            elif "ingredient" in header_text:
+                ingredient_col = idx
+
+        # Skip if we can't find both columns
+        if product_col is None or ingredient_col is None:
+            continue
+
+        # Parse data rows
+        data_rows = table.find_all("tr")[1:]  # Skip header row
+
+        for row in data_rows:
+            # Filter Java Edition rows
+            if not is_java_edition(row):
                 continue
 
-            # Find input slot (ingredient)
-            input_slots = ui.find_all("span", class_=re.compile(r"mcui-input|invslot"))
-
-            input_items: List[Item] = []
-            for slot in input_slots:
-                # Skip fuel slots
-                if "fuel" in slot.get("class", []):
-                    continue
-
-                items = find_item_in_slot(slot)
-                if items:
-                    input_items.extend(items)
-
-            # Find output slot
-            output_section = ui.find("span", class_="mcui-output")
-            if not output_section:
+            # Get all cells (th and td)
+            cells = row.find_all(["th", "td"])
+            if len(cells) < max(product_col, ingredient_col) + 1:
                 continue
 
-            output_items = find_item_in_slot(output_section)
+            # Extract output item from Product column (first <th>)
+            output_cell = cells[product_col]
+            output_links = output_cell.find_all("a", href=re.compile(r"^/w/"))
+            if not output_links:
+                continue
 
-            if input_items and output_items:
-                transformations.append(
-                    Transformation(
-                        transformation_type=trans_type,
-                        inputs=input_items[:1],  # Single input for smelting
-                        outputs=output_items[:1],  # Single output
-                    )
+            output_item = extract_item_from_link(output_links[0])
+            if not output_item:
+                continue
+
+            # Extract input item(s) from Ingredient column (first <td>)
+            ingredient_cell = cells[ingredient_col]
+
+            # Check for multiple ingredients separated by " or "
+            # Split by <br> tags and " or " text
+            ingredient_parts = []
+
+            # Find all invslot elements
+            invslots = ingredient_cell.find_all("span", class_="invslot")
+            if invslots:
+                # Get links from each invslot
+                for invslot in invslots:
+                    links = invslot.find_all("a", href=re.compile(r"^/w/"))
+                    if links:
+                        ingredient_parts.append(extract_item_from_link(links[0]))
+            else:
+                # Fallback: find all links directly
+                ingredient_links = ingredient_cell.find_all("a", href=re.compile(r"^/w/"))
+                for link in ingredient_links:
+                    ingredient_parts.append(extract_item_from_link(link))
+
+            # Filter out None values
+            ingredient_items = [item for item in ingredient_parts if item]
+
+            if not ingredient_items:
+                continue
+
+            # Create separate transformation for each ingredient option
+            # This handles cases like "Raw Gold OR Nether Gold Ore"
+            for input_item in ingredient_items:
+                transformation = Transformation(
+                    transformation_type=TransformationType.SMELTING,
+                    inputs=[input_item],
+                    outputs=[output_item],
                 )
+
+                # Use deduplication to avoid duplicate entries
+                sig = transformation.get_signature()
+                if sig not in seen_signatures:
+                    seen_signatures.add(sig)
+                    transformations.append(transformation)
 
     return transformations
 
