@@ -158,7 +158,7 @@ uv run python src/visualize_graph_3d.py --help
 
 **3D Visualization Features:**
 - **Interactive Controls**: Rotate with mouse drag, zoom with scroll wheel, pan with right-click drag
-- **Spatial Layout**: Uses spectral layout algorithm to position nodes in 3D space
+- **Spatial Layout**: Uses spring layout algorithm to position nodes in 3D space
 - **Node Sizing**: Node size reflects importance (based on degree centrality - more connections = larger node)
 - **Edge Coloring**: Edges colored by transformation type using the same color configuration as 2D graphs
 - **Intermediate Nodes**: Multi-input transformations use small gray intermediate nodes
@@ -168,7 +168,7 @@ uv run python src/visualize_graph_3d.py --help
 
 | Aspect | 2D (Graphviz) | 3D (NetworkX + Matplotlib) |
 |--------|---------------|----------------------------|
-| Layout | Hierarchical, static | Spectral, spatial |
+| Layout | Hierarchical, static | Spring (force-directed), spatial |
 | Interactivity | None (static images) | Full rotation, zoom, pan |
 | Readability | Can be cluttered with large graphs | Better use of 3D space |
 | Output | SVG, PNG, PDF files | Interactive window + optional save |

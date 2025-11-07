@@ -237,7 +237,7 @@ def build_graph_from_csv(csv_path: str, color_config: Dict[str, str]) -> nx.DiGr
 
 def compute_3d_layout(graph: nx.DiGraph) -> Dict[str, Tuple[float, float, float]]:
     """
-    Compute 3D positions for graph nodes using spectral layout.
+    Compute 3D positions for graph nodes using spring layout.
 
     Args:
         graph: NetworkX DiGraph
@@ -250,18 +250,10 @@ def compute_3d_layout(graph: nx.DiGraph) -> Dict[str, Tuple[float, float, float]
     if num_nodes == 0:
         return {}
 
-    # Use spectral layout for 3D positioning
-    # For very small graphs, spectral layout may fail, so fall back to spring layout
-    try:
-        if num_nodes >= 3:
-            pos = nx.spectral_layout(graph, dim=3)
-            logging.info("Using spectral layout for 3D positioning")
-        else:
-            pos = nx.spring_layout(graph, dim=3, seed=42)
-            logging.info("Using spring layout for 3D positioning (graph too small for spectral)")
-    except Exception as e:
-        logging.warning(f"Spectral layout failed: {e}, falling back to spring layout")
-        pos = nx.spring_layout(graph, dim=3, seed=42)
+    # Use spring layout for 3D positioning
+    # Spring layout is force-directed and works reliably for all graph sizes
+    pos = nx.spring_layout(graph, dim=3, seed=42)
+    logging.info("Using spring layout for 3D positioning")
 
     return pos
 

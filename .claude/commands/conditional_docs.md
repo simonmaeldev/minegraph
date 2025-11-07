@@ -47,7 +47,7 @@ This prompt helps you determine what documentation you should read based on the 
   - Conditions:
     - When working with 3D graph visualization or NetworkX integration
     - When implementing interactive visualizations using Matplotlib
-    - When working with spectral or spring layout algorithms
+    - When working with spring layout (force-directed) algorithms
     - When troubleshooting 3D rendering or layout computation issues
     - When implementing node sizing based on degree centrality
     - When handling multi-input transformations with intermediate nodes in 3D space

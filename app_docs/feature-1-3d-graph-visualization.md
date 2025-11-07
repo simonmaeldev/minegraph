@@ -37,9 +37,10 @@ The implementation includes:
 - Reuses existing `config/graph_colors.txt` for edge coloring by transformation type
 
 **3D Layout Algorithm:**
-- Primary: Spectral layout (`nx.spectral_layout` with dim=3) for optimal spatial positioning
-- Fallback: Spring layout for small graphs (<3 nodes) where spectral layout may fail
-- Layout computation separates densely connected clusters and minimizes edge crossings
+- Spring layout (`nx.spring_layout` with dim=3, seed=42) for force-directed spatial positioning
+- Force-directed physics simulation: nodes repel each other, edges act as springs pulling connected nodes together
+- Works reliably for all graph sizes and provides reproducible layouts
+- Layout computation creates organic clustering based on connectivity patterns
 
 **Node Sizing Strategy:**
 - Item nodes: Size based on degree centrality (50-500 units) - more connections = larger node
@@ -137,7 +138,7 @@ All tests pass with 100% success rate.
 
 With 1961+ transformations:
 - **Graph construction**: Fast (<1 second)
-- **Spectral layout computation**: May take 5-30 seconds depending on graph complexity
+- **Spring layout computation**: May take 5-30 seconds depending on graph complexity
 - **Rendering**: Matplotlib handles large graphs well with hardware acceleration
 - **Interactive rotation**: Remains smooth even with many nodes/edges
 
@@ -145,7 +146,7 @@ With 1961+ transformations:
 
 | Aspect | 2D (Graphviz) | 3D (NetworkX + Matplotlib) |
 |--------|---------------|----------------------------|
-| Layout | Hierarchical, static | Spectral, spatial |
+| Layout | Hierarchical, static | Spring (force-directed), spatial |
 | Interactivity | None (static images) | Full rotation, zoom, pan |
 | Readability | Can be cluttered with large graphs | Better use of 3D space |
 | Output | SVG, PNG, PDF files | Interactive window + optional save |

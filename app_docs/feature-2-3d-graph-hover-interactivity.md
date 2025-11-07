@@ -54,7 +54,7 @@ The implementation includes three key enhancements:
 - Removed `ax.set_xticks([])`, `ax.set_yticks([])`, `ax.set_zticks([])` calls
 - Added comment explaining that numeric scales help users understand zoom levels
 - Matplotlib now automatically generates tick marks based on node position ranges
-- Typical coordinate ranges are approximately -1 to 1 due to spectral layout normalization
+- Coordinate ranges vary with spring layout but are typically centered around 0
 
 **Interactive Toolbar:**
 - No code changes required - toolbar appears by default with `plt.show()` when using interactive matplotlib backends (Qt5Agg, TkAgg)
@@ -127,7 +127,7 @@ The hover annotation feature was validated through interactive testing:
 
 4. **Axis Scale Verification**:
    - Confirmed numeric tick marks appear on all three axes (X, Y, Z)
-   - Verified scales show appropriate ranges (approximately -1 to 1 from spectral layout)
+   - Verified scales show appropriate ranges (centered around 0 from spring layout)
    - Tested that zoom operations update axis ranges accordingly
 
 5. **Toolbar Verification**:
