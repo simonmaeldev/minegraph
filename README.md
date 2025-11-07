@@ -90,6 +90,54 @@ uv run python src/validate_output.py
 
 This checks for duplicates, orphaned transformations, and reports statistics.
 
+### Download Item Images
+
+Before visualizing graphs with images, download item images from Minecraft Wiki:
+
+```bash
+# Download all item images (recommended - run once)
+uv run python src/download_item_images.py --input output/items.csv --output-dir images/
+
+# Download with verbose logging to see progress
+uv run python src/download_item_images.py --input output/items.csv --output-dir images/ --verbose
+
+# Download first 10 items only (for testing)
+uv run python src/download_item_images.py --input output/items.csv --output-dir images/ --limit 10
+
+# Force re-download existing images
+uv run python src/download_item_images.py --input output/items.csv --output-dir images/ --force-redownload
+
+# Dry run (simulate without downloading)
+uv run python src/download_item_images.py --dry-run
+
+# Show help for all options
+uv run python src/download_item_images.py --help
+```
+
+**Command-line Options:**
+- `--input`: Path to items CSV file (default: `output/items.csv`)
+- `--output-dir`: Directory to save images (default: `images/`)
+- `--force-redownload`: Force re-download of existing images
+- `--convert-gifs`: Automatically convert GIF files to PNG format (default: enabled)
+- `--no-convert-gifs`: Disable automatic GIF to PNG conversion
+- `--verbose`: Enable verbose logging
+- `--dry-run`: Simulate downloads without actually downloading
+- `--delay`: Delay between downloads in seconds (default: 0.5)
+- `--limit`: Limit number of items to process (for testing)
+
+**Notes:**
+- Images are cached locally in the `images/` directory (excluded from git)
+- Already downloaded images are skipped (unless `--force-redownload` is used)
+- Images are saved with standardized filenames (e.g., `iron_ingot.png`)
+- The script downloads the main infobox image from each wiki page
+- **GIF images are automatically converted to PNG format** for matplotlib compatibility
+  - Some items (banners, chests, campfire, clock, compass) are provided as GIF files by the wiki
+  - The conversion uses ffmpeg to extract the first frame and convert to PNG
+  - This ensures compatibility with the 3D visualization feature
+  - Requires `ffmpeg` to be installed on your system
+- With 850+ items, full download may take 5-10 minutes
+- Failed downloads are logged but don't stop the process
+
 ### Visualize Transformation Graph
 
 Minegraph provides two visualization options: **static 2D graphs** (Graphviz) and **interactive 3D graphs** (NetworkX + Matplotlib).
@@ -131,8 +179,14 @@ uv run python src/visualize_graph_with_graphviz.py --help
 Generate an interactive 3D visualization that you can rotate, zoom, and pan:
 
 ```bash
-# Display interactive 3D visualization (default behavior)
+# Display interactive 3D visualization (default behavior - colored spheres)
 uv run python src/visualize_graph_3d.py
+
+# Display with item images instead of spheres (requires downloaded images)
+uv run python src/visualize_graph_3d.py --use-images
+
+# Display with images from custom directory
+uv run python src/visualize_graph_3d.py --use-images --images-dir my_images/
 
 # Display with custom input path
 uv run python src/visualize_graph_3d.py -i output/transformations.csv
@@ -146,6 +200,9 @@ uv run python src/visualize_graph_3d.py -v
 # Save visualization to file (optional)
 uv run python src/visualize_graph_3d.py -o output/graphs/graph_3d.png
 
+# Full example: images + verbose + save
+uv run python src/visualize_graph_3d.py --use-images -v -o output/graphs/graph_3d_images.png
+
 # Show help for all options
 uv run python src/visualize_graph_3d.py --help
 ```
@@ -155,11 +212,16 @@ uv run python src/visualize_graph_3d.py --help
 - `-c, --config`: Path to color config (default: `config/graph_colors.txt`)
 - `-o, --output`: Optional output file path to save figure (if not provided, only displays)
 - `-v, --verbose`: Enable verbose logging
+- `--use-images`: Use item images instead of colored spheres for nodes
+- `--images-dir`: Directory containing item images (default: `images/`)
 
 **3D Visualization Features:**
 - **Interactive Controls**: Rotate with mouse drag, zoom with scroll wheel, pan with right-click drag
 - **Spatial Layout**: Uses spring layout algorithm to position nodes in 3D space
 - **Node Sizing**: Node size reflects importance (based on degree centrality - more connections = larger node)
+- **Image-Based Nodes**: Display actual Minecraft item images instead of abstract spheres (`--use-images` flag)
+- **Hover Annotations**: Hover over nodes to see item names
+- **Fallback Rendering**: Items without images automatically fall back to colored spheres
 - **Edge Coloring**: Edges colored by transformation type using the same color configuration as 2D graphs
 - **Intermediate Nodes**: Multi-input transformations use small gray intermediate nodes
 - **No System Dependencies**: Uses NetworkX and Matplotlib (already included), no need to install Graphviz

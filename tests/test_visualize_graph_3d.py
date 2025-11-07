@@ -12,10 +12,13 @@ from src.visualize_graph_3d import (
     build_graph_from_csv,
     calculate_node_sizes,
     compute_3d_layout,
+    create_image_plane,
     get_edge_colors,
     load_color_config,
+    load_item_image,
     load_transformations_from_csv,
     render_3d_graph,
+    standardize_filename,
 )
 
 
@@ -809,4 +812,132 @@ class TestRender3DGraph:
         assert y_ticks is not None
         assert z_ticks is not None
 
+        plt.close(fig)
+
+
+class TestImageFunctionality:
+    """Test cases for image loading and rendering functionality."""
+
+    def test_standardize_filename_basic(self):
+        """Test basic filename standardization."""
+        assert standardize_filename("Iron Ingot") == "iron_ingot.png"
+        assert standardize_filename("Oak Planks") == "oak_planks.png"
+
+    def test_standardize_filename_special_chars(self):
+        """Test filename standardization with special characters."""
+        assert standardize_filename("Iron-Ingot!") == "ironingot.png"
+        assert standardize_filename("Boat (Oak)") == "boat_oak.png"
+
+    def test_load_item_image_nonexistent(self):
+        """Test loading image that doesn't exist."""
+        cache = {}
+        img = load_item_image("Nonexistent Item", "/nonexistent/path", cache)
+        assert img is None
+        assert "Nonexistent Item" in cache
+        assert cache["Nonexistent Item"] is None
+
+    def test_load_item_image_cache(self):
+        """Test that image cache is used."""
+        import numpy as np
+
+        cache = {}
+        fake_img = np.array([[[255, 0, 0]]])  # Fake image
+
+        # Pre-populate cache
+        cache["Iron Ingot"] = fake_img
+
+        # Should return cached image without trying to load from disk
+        img = load_item_image("Iron Ingot", "/nonexistent/path", cache)
+        assert img is not None
+        assert np.array_equal(img, fake_img)
+
+    def test_load_item_image_real_file(self):
+        """Test loading a real image file."""
+        import numpy as np
+        from PIL import Image
+
+        # Create a temporary image file
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a simple test image
+            test_img = Image.new('RGB', (10, 10), color=(255, 0, 0))
+            img_path = Path(tmpdir) / "iron_ingot.png"
+            test_img.save(img_path)
+
+            # Test loading
+            cache = {}
+            img = load_item_image("Iron Ingot", tmpdir, cache)
+
+            assert img is not None
+            assert isinstance(img, np.ndarray)
+            assert "Iron Ingot" in cache
+            assert cache["Iron Ingot"] is not None
+
+    def test_create_image_plane_basic(self):
+        """Test creating image plane in 3D space."""
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        import numpy as np
+
+        # Create a simple test image
+        test_img = np.ones((10, 10, 3))
+
+        # Create 3D axes
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+
+        # Should not raise errors
+        create_image_plane(ax, test_img, (0, 0, 0), 100)
+
+        plt.close(fig)
+
+    def test_render_with_images_enabled(self):
+        """Test rendering with image mode enabled but no images available."""
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+
+        graph = nx.DiGraph()
+        graph.add_node('Item1', node_type='item')
+        graph.add_node('Item2', node_type='item')
+        graph.add_edge('Item1', 'Item2', transformation_type='crafting')
+
+        pos = {'Item1': (0, 0, 0), 'Item2': (1, 1, 1)}
+        node_sizes = {'Item1': 50, 'Item2': 50}
+        edge_colors = ['#4A90E2']
+        color_config = {'crafting': '#4A90E2'}
+
+        # Render with images enabled but no images directory
+        render_3d_graph(
+            graph, pos, node_sizes, edge_colors, color_config,
+            use_images=True,
+            images_dir="/nonexistent/path"
+        )
+
+        fig = plt.gcf()
+        plt.close(fig)
+
+    def test_render_with_images_disabled(self):
+        """Test rendering with image mode disabled (default behavior)."""
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+
+        graph = nx.DiGraph()
+        graph.add_node('Item1', node_type='item')
+        graph.add_node('Item2', node_type='item')
+        graph.add_edge('Item1', 'Item2', transformation_type='crafting')
+
+        pos = {'Item1': (0, 0, 0), 'Item2': (1, 1, 1)}
+        node_sizes = {'Item1': 50, 'Item2': 50}
+        edge_colors = ['#4A90E2']
+        color_config = {'crafting': '#4A90E2'}
+
+        # Render without images (default)
+        render_3d_graph(
+            graph, pos, node_sizes, edge_colors, color_config,
+            use_images=False
+        )
+
+        fig = plt.gcf()
         plt.close(fig)

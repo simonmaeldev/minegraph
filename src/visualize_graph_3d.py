@@ -5,11 +5,14 @@ import csv
 import json
 import logging
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 import networkx as nx
+import numpy as np
 from mpl_toolkits.mplot3d import Axes3D
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
 
 # Default color mappings if config file is missing or incomplete
@@ -66,6 +69,126 @@ def load_color_config(config_path: str) -> Dict[str, str]:
         logging.error(f"Error loading config file: {e}, using default colors")
 
     return colors
+
+
+def standardize_filename(item_name: str) -> str:
+    """
+    Convert item name to standardized filename format.
+
+    Args:
+        item_name: Original item name (e.g., "Iron Ingot")
+
+    Returns:
+        Standardized filename (e.g., "iron_ingot.png")
+    """
+    import re
+    # Convert to lowercase and replace spaces with underscores
+    filename = item_name.lower().replace(" ", "_")
+    # Remove special characters that might cause issues
+    filename = "".join(c for c in filename if c.isalnum() or c == "_")
+    # Collapse multiple underscores into one
+    filename = re.sub(r"_+", "_", filename)
+    return f"{filename}.png"
+
+
+def load_item_image(
+    item_name: str,
+    images_dir: str,
+    image_cache: Dict[str, Optional[np.ndarray]]
+) -> Optional[np.ndarray]:
+    """
+    Load an item image from disk with caching.
+
+    Args:
+        item_name: Name of the item
+        images_dir: Directory containing images
+        image_cache: Dictionary to cache loaded images
+
+    Returns:
+        Image array if found, None otherwise
+    """
+    # Check cache first
+    if item_name in image_cache:
+        return image_cache[item_name]
+
+    # Generate standardized filename
+    filename = standardize_filename(item_name)
+    image_path = Path(images_dir) / filename
+
+    # Try to load the image
+    try:
+        if image_path.exists():
+            img = mpimg.imread(str(image_path))
+            image_cache[item_name] = img
+            logging.debug(f"Loaded image for {item_name}: {image_path}")
+            return img
+        else:
+            logging.debug(f"No image found for {item_name}: {image_path}")
+            image_cache[item_name] = None
+            return None
+    except Exception as e:
+        logging.warning(f"Failed to load image for {item_name}: {e}")
+        image_cache[item_name] = None
+        return None
+
+
+def create_image_plane(
+    ax: Axes3D,
+    image: np.ndarray,
+    center: Tuple[float, float, float],
+    size: float,
+    camera_pos: Optional[Tuple[float, float, float]] = None
+) -> None:
+    """
+    Create a billboard-style image plane in 3D space that faces the camera.
+
+    Args:
+        ax: Matplotlib 3D axes
+        image: Image array to display
+        center: (x, y, z) center position
+        size: Size of the plane (width/height)
+        camera_pos: Optional camera position for billboard effect
+    """
+    x, y, z = center
+
+    # Scale size to match visual appearance of scatter points
+    # Scatter points use area (s), so we need to scale accordingly
+    scale = np.sqrt(size) / 20  # Empirical scaling factor
+
+    # Create a simple square plane facing forward
+    # We'll create vertices for a square in the XY plane
+    half_size = scale / 2
+
+    # Define the four corners of the plane (facing +Z initially)
+    verts = [
+        [x - half_size, y - half_size, z],
+        [x + half_size, y - half_size, z],
+        [x + half_size, y + half_size, z],
+        [x - half_size, y + half_size, z]
+    ]
+
+    # Create the polygon
+    poly = Poly3DCollection([verts], alpha=1.0)
+
+    # Set the image as texture
+    # For matplotlib 3D, we'll use facecolors instead of texture mapping
+    # We'll approximate by sampling the center color of the image
+    # For a better effect, we could use the average color or center pixel
+
+    # Extract a representative color from the image center
+    h, w = image.shape[:2]
+    if len(image.shape) == 3:
+        # RGB or RGBA image
+        center_color = image[h // 2, w // 2, :]
+    else:
+        # Grayscale image
+        center_color = [image[h // 2, w // 2]] * 3
+
+    poly.set_facecolor(center_color)
+    poly.set_edgecolor('black')
+    poly.set_linewidth(0.5)
+
+    ax.add_collection3d(poly)
 
 
 def load_transformations_from_csv(csv_path: str) -> List[Dict]:
@@ -319,7 +442,9 @@ def render_3d_graph(
     pos: Dict[str, Tuple[float, float, float]],
     node_sizes: Dict[str, float],
     edge_colors: List[str],
-    color_config: Dict[str, str]
+    color_config: Dict[str, str],
+    use_images: bool = False,
+    images_dir: str = "images"
 ) -> None:
     """
     Render the 3D graph using Matplotlib with hover annotations.
@@ -330,6 +455,8 @@ def render_3d_graph(
         node_sizes: Node sizes dictionary
         edge_colors: List of edge colors
         color_config: Color configuration dictionary
+        use_images: Whether to use item images instead of spheres
+        images_dir: Directory containing item images
     """
     fig = plt.figure(figsize=(16, 12))
     ax = fig.add_subplot(111, projection='3d')
@@ -351,23 +478,87 @@ def render_3d_graph(
         z_line = [pos[u][2], pos[v][2]]
         ax.plot(x_line, y_line, z_line, color=edge_colors[idx], alpha=0.4, linewidth=0.5)
 
-    # Plot item nodes (larger, colored)
-    item_scatter = None
-    if item_nodes:
-        item_xs = [pos[node][0] for node in item_nodes]
-        item_ys = [pos[node][1] for node in item_nodes]
-        item_zs = [pos[node][2] for node in item_nodes]
-        item_sizes_list = [node_sizes[node] for node in item_nodes]
+    # Initialize image cache
+    image_cache: Dict[str, Optional[np.ndarray]] = {}
 
-        item_scatter = ax.scatter(
-            item_xs, item_ys, item_zs,
-            s=item_sizes_list,
-            c='#3498db',  # Blue color for item nodes
-            alpha=0.7,
-            edgecolors='black',
-            linewidths=0.5,
-            depthshade=True
-        )
+    # Plot item nodes (larger, colored or with images)
+    item_scatter = None
+    items_with_images = []
+    items_without_images = []
+
+    if use_images and item_nodes:
+        # Try to load images for each item
+        for node in item_nodes:
+            img = load_item_image(node, images_dir, image_cache)
+            if img is not None:
+                items_with_images.append(node)
+            else:
+                items_without_images.append(node)
+
+        # Render items with images as planes
+        for node in items_with_images:
+            img = image_cache[node]
+            create_image_plane(
+                ax,
+                img,
+                pos[node],
+                node_sizes[node]
+            )
+
+        logging.info(f"Rendered {len(items_with_images)} items with images")
+
+        # Render items without images as spheres (fallback)
+        if items_without_images:
+            fallback_xs = [pos[node][0] for node in items_without_images]
+            fallback_ys = [pos[node][1] for node in items_without_images]
+            fallback_zs = [pos[node][2] for node in items_without_images]
+            fallback_sizes = [node_sizes[node] for node in items_without_images]
+
+            ax.scatter(
+                fallback_xs, fallback_ys, fallback_zs,
+                s=fallback_sizes,
+                c='#3498db',  # Blue color for fallback nodes
+                alpha=0.7,
+                edgecolors='black',
+                linewidths=0.5,
+                depthshade=True
+            )
+            logging.info(f"Rendered {len(items_without_images)} items as spheres (no image)")
+
+        # For hover functionality, we need a scatter plot with all item positions
+        if item_nodes:
+            item_xs = [pos[node][0] for node in item_nodes]
+            item_ys = [pos[node][1] for node in item_nodes]
+            item_zs = [pos[node][2] for node in item_nodes]
+            item_sizes_list = [node_sizes[node] for node in item_nodes]
+
+            # Invisible scatter plot for hover detection
+            item_scatter = ax.scatter(
+                item_xs, item_ys, item_zs,
+                s=item_sizes_list,
+                c='none',  # Transparent
+                alpha=0.0,
+                edgecolors='none',
+                depthshade=False
+            )
+
+    else:
+        # Original sphere rendering (no images)
+        if item_nodes:
+            item_xs = [pos[node][0] for node in item_nodes]
+            item_ys = [pos[node][1] for node in item_nodes]
+            item_zs = [pos[node][2] for node in item_nodes]
+            item_sizes_list = [node_sizes[node] for node in item_nodes]
+
+            item_scatter = ax.scatter(
+                item_xs, item_ys, item_zs,
+                s=item_sizes_list,
+                c='#3498db',  # Blue color for item nodes
+                alpha=0.7,
+                edgecolors='black',
+                linewidths=0.5,
+                depthshade=True
+            )
 
     # Plot intermediate nodes (smaller, gray)
     intermediate_scatter = None
@@ -466,7 +657,9 @@ def render_3d_graph(
 def visualize_3d(
     csv_path: str,
     config_path: str,
-    output_path: str = None
+    output_path: str = None,
+    use_images: bool = False,
+    images_dir: str = "images"
 ) -> None:
     """
     Generate interactive 3D visualization of transformation graph.
@@ -475,6 +668,8 @@ def visualize_3d(
         csv_path: Path to transformations CSV file
         config_path: Path to color configuration file
         output_path: Optional path to save figure (if None, only displays)
+        use_images: Whether to use item images instead of spheres
+        images_dir: Directory containing item images
     """
     # Load color configuration
     color_config = load_color_config(config_path)
@@ -497,7 +692,11 @@ def visualize_3d(
 
     # Render the 3D visualization
     logging.info("Rendering 3D visualization...")
-    render_3d_graph(graph, pos, node_sizes, edge_colors, color_config)
+    render_3d_graph(
+        graph, pos, node_sizes, edge_colors, color_config,
+        use_images=use_images,
+        images_dir=images_dir
+    )
 
     # Save to file if output path provided
     if output_path:
@@ -540,6 +739,18 @@ def main():
         help='Enable verbose logging'
     )
 
+    parser.add_argument(
+        '--use-images',
+        action='store_true',
+        help='Use item images instead of colored spheres for nodes'
+    )
+
+    parser.add_argument(
+        '--images-dir',
+        default='images',
+        help='Directory containing item images (default: images/)'
+    )
+
     args = parser.parse_args()
 
     # Configure logging
@@ -553,7 +764,9 @@ def main():
         visualize_3d(
             csv_path=args.input,
             config_path=args.config,
-            output_path=args.output
+            output_path=args.output,
+            use_images=args.use_images,
+            images_dir=args.images_dir
         )
 
         if args.output:
