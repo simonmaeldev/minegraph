@@ -11,8 +11,10 @@ import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import networkx as nx
 import numpy as np
-from mpl_toolkits.mplot3d import Axes3D
+from mpl_toolkits.mplot3d import Axes3D, proj3d
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+from matplotlib.widgets import Slider
 
 
 # Default color mappings if config file is missing or incomplete
@@ -130,65 +132,6 @@ def load_item_image(
         logging.warning(f"Failed to load image for {item_name}: {e}")
         image_cache[item_name] = None
         return None
-
-
-def create_image_plane(
-    ax: Axes3D,
-    image: np.ndarray,
-    center: Tuple[float, float, float],
-    size: float,
-    camera_pos: Optional[Tuple[float, float, float]] = None
-) -> None:
-    """
-    Create a billboard-style image plane in 3D space that faces the camera.
-
-    Args:
-        ax: Matplotlib 3D axes
-        image: Image array to display
-        center: (x, y, z) center position
-        size: Size of the plane (width/height)
-        camera_pos: Optional camera position for billboard effect
-    """
-    x, y, z = center
-
-    # Scale size to match visual appearance of scatter points
-    # Scatter points use area (s), so we need to scale accordingly
-    scale = np.sqrt(size) / 20  # Empirical scaling factor
-
-    # Create a simple square plane facing forward
-    # We'll create vertices for a square in the XY plane
-    half_size = scale / 2
-
-    # Define the four corners of the plane (facing +Z initially)
-    verts = [
-        [x - half_size, y - half_size, z],
-        [x + half_size, y - half_size, z],
-        [x + half_size, y + half_size, z],
-        [x - half_size, y + half_size, z]
-    ]
-
-    # Create the polygon
-    poly = Poly3DCollection([verts], alpha=1.0)
-
-    # Set the image as texture
-    # For matplotlib 3D, we'll use facecolors instead of texture mapping
-    # We'll approximate by sampling the center color of the image
-    # For a better effect, we could use the average color or center pixel
-
-    # Extract a representative color from the image center
-    h, w = image.shape[:2]
-    if len(image.shape) == 3:
-        # RGB or RGBA image
-        center_color = image[h // 2, w // 2, :]
-    else:
-        # Grayscale image
-        center_color = [image[h // 2, w // 2]] * 3
-
-    poly.set_facecolor(center_color)
-    poly.set_edgecolor('black')
-    poly.set_linewidth(0.5)
-
-    ax.add_collection3d(poly)
 
 
 def load_transformations_from_csv(csv_path: str) -> List[Dict]:
@@ -459,7 +402,12 @@ def render_3d_graph(
         images_dir: Directory containing item images
     """
     fig = plt.figure(figsize=(16, 12))
-    ax = fig.add_subplot(111, projection='3d')
+
+    # Create 3D axes with space for slider at the bottom
+    if use_images:
+        ax = fig.add_subplot(111, projection='3d', position=[0.05, 0.15, 0.9, 0.8])
+    else:
+        ax = fig.add_subplot(111, projection='3d')
 
     # Extract 3D coordinates
     nodes = list(graph.nodes())
@@ -471,12 +419,27 @@ def render_3d_graph(
     item_nodes = [n for n in nodes if graph.nodes[n].get('node_type') == 'item']
     intermediate_nodes = [n for n in nodes if graph.nodes[n].get('node_type') == 'intermediate']
 
-    # Plot edges
+    # Plot edges with arrows showing direction
     for idx, (u, v) in enumerate(graph.edges()):
-        x_line = [pos[u][0], pos[v][0]]
-        y_line = [pos[u][1], pos[v][1]]
-        z_line = [pos[u][2], pos[v][2]]
-        ax.plot(x_line, y_line, z_line, color=edge_colors[idx], alpha=0.4, linewidth=0.5)
+        # Get start and end positions
+        x_start, y_start, z_start = pos[u]
+        x_end, y_end, z_end = pos[v]
+
+        # Calculate direction vector
+        dx = x_end - x_start
+        dy = y_end - y_start
+        dz = z_end - z_start
+
+        # Draw the arrow from u to v
+        ax.quiver(
+            x_start, y_start, z_start,  # Start position
+            dx, dy, dz,  # Direction vector
+            color=edge_colors[idx],
+            alpha=0.6,
+            linewidth=1.5,
+            arrow_length_ratio=0.2,  # Arrow head size relative to line length
+            normalize=False  # Use actual vector length
+        )
 
     # Initialize image cache
     image_cache: Dict[str, Optional[np.ndarray]] = {}
@@ -485,6 +448,19 @@ def render_3d_graph(
     item_scatter = None
     items_with_images = []
     items_without_images = []
+    annotation_boxes = []  # Store annotation boxes for draw event handler
+
+    # Create slider widget for image size control (if using images)
+    # Store as fig attribute to prevent garbage collection
+    fig._image_size_slider = None
+    slider_scale = [1.0]  # Mutable container for slider scale factor
+    if use_images:
+        slider_ax = fig.add_axes([0.2, 0.05, 0.6, 0.03])
+        slider_ax.set_facecolor('#f0f0f0')
+        fig._image_size_slider = Slider(
+            slider_ax, 'Image Size', 0.5, 2.0, valinit=1.0, valstep=0.1
+        )
+        logging.info("Created interactive image size slider (0.5x - 2.0x, default: 1.0x)")
 
     if use_images and item_nodes:
         # Try to load images for each item
@@ -495,15 +471,42 @@ def render_3d_graph(
             else:
                 items_without_images.append(node)
 
-        # Render items with images as planes
+        # Render items with images using AnnotationBbox approach
         for node in items_with_images:
             img = image_cache[node]
-            create_image_plane(
-                ax,
-                img,
-                pos[node],
-                node_sizes[node]
+            x, y, z = pos[node]
+
+            # Calculate zoom factor based on node size
+            zoom = np.sqrt(node_sizes[node]) / 100.0
+
+            # Create OffsetImage that will face the camera
+            imagebox = OffsetImage(img, zoom=zoom)
+            imagebox.image.axes = ax
+
+            # Project 3D coordinates to 2D screen space
+            x2, y2, _ = proj3d.proj_transform(x, y, z, ax.get_proj())
+
+            # Create AnnotationBbox with the image at the projected 2D position
+            ab = AnnotationBbox(
+                imagebox,
+                (x2, y2),
+                xycoords='data',
+                frameon=False,
+                pad=0,
+                box_alignment=(0.5, 0.5)
             )
+
+            # Add the annotation to the axes
+            ax.add_artist(ab)
+
+            # Store for later updates during camera rotation and zoom
+            annotation_boxes.append({
+                'ab': ab,
+                'node': node,
+                'pos_3d': (x, y, z),
+                'base_zoom': zoom,
+                'imagebox': imagebox
+            })
 
         logging.info(f"Rendered {len(items_with_images)} items with images")
 
@@ -651,6 +654,56 @@ def render_3d_graph(
     # Connect hover event handler
     fig.canvas.mpl_connect("motion_notify_event", hover)
 
+    # Add draw event handler to update image positions during camera rotation and zoom
+    if annotation_boxes:
+        def update_image_positions(event):
+            """Update annotation box positions when the view changes."""
+            for item in annotation_boxes:
+                ab = item['ab']
+                x, y, z = item['pos_3d']
+                base_zoom = item['base_zoom']
+                imagebox = item['imagebox']
+
+                # Update image zoom based on slider scale only (no automatic zoom)
+                new_zoom = base_zoom * slider_scale[0]
+                imagebox.set_zoom(new_zoom)
+
+                # Re-project 3D coordinates to current 2D screen coordinates
+                x2, y2, _ = proj3d.proj_transform(x, y, z, ax.get_proj())
+                ab.xybox = (x2, y2)
+                ab.xy = (x2, y2)
+
+        fig.canvas.mpl_connect('draw_event', update_image_positions)
+
+        def on_scroll(event):
+            """Handle scroll events to trigger immediate redraw."""
+            # Force redraw on scroll to update image positions immediately
+            fig.canvas.draw_idle()
+
+        fig.canvas.mpl_connect('scroll_event', on_scroll)
+
+        def on_button_release(event):
+            """Handle button release events to trigger redraw after interactions."""
+            # Trigger a redraw to update image positions after mouse interactions
+            fig.canvas.draw_idle()
+
+        fig.canvas.mpl_connect('button_release_event', on_button_release)
+        logging.info("Draw, scroll, and interaction event handlers connected for image position updates")
+
+    # Connect slider callback if slider was created (must be outside annotation_boxes block)
+    if fig._image_size_slider is not None:
+        def on_slider_change(val):
+            """Handle slider value changes to update image sizes."""
+            slider_scale[0] = val
+            if annotation_boxes:
+                # Manually trigger update_image_positions
+                update_image_positions(None)
+                fig.canvas.draw_idle()
+            logging.debug(f"Image size slider changed to {val:.1f}x")
+
+        fig._image_size_slider.on_changed(on_slider_change)
+        logging.info("Connected slider callback for interactive image size control")
+
     logging.info("3D visualization rendered successfully with hover annotations")
 
 
@@ -742,7 +795,7 @@ def main():
     parser.add_argument(
         '--use-images',
         action='store_true',
-        help='Use item images instead of colored spheres for nodes'
+        help='Use item images instead of colored spheres for nodes (includes interactive size slider)'
     )
 
     parser.add_argument(

@@ -734,3 +734,121 @@ class TestParsers:
 
         assert minecart.metadata.get("category") == "transportation"
         assert sword.metadata.get("category") == "combat"
+
+
+class TestEducationEditionFiltering:
+    """Tests for Education Edition content filtering."""
+
+    def test_filters_infobox_links(self):
+        """Test that links in infobox captions are filtered out."""
+        html = '''
+        <div class="infobox">
+            <div class="infobox-imagecaption">
+                <p><i><a href="/w/Bedrock_Edition" title="Bedrock Edition">Bedrock Edition</a></i></p>
+            </div>
+        </div>
+        '''
+        soup = BeautifulSoup(html, "lxml")
+        link = soup.find("a")
+
+        item = extract_item_from_link(link)
+
+        assert item is None
+
+    def test_filters_education_edition_chemistry_items(self):
+        """Test that Education Edition chemistry items are filtered out."""
+        html = '<a href="/w/Cerium_Chloride" title="Cerium Chloride">Cerium Chloride</a>'
+        soup = BeautifulSoup(html, "lxml")
+        link = soup.find("a")
+
+        item = extract_item_from_link(link)
+
+        assert item is None
+
+    def test_filters_colored_torches(self):
+        """Test that colored torches (Education Edition) are filtered out."""
+        html = '<a href="/w/Blue_Torch" title="Blue Torch">Blue Torch</a>'
+        soup = BeautifulSoup(html, "lxml")
+        link = soup.find("a")
+
+        item = extract_item_from_link(link)
+
+        assert item is None
+
+    def test_allows_java_edition_items(self):
+        """Test that valid Java Edition items are NOT filtered."""
+        html = '<a href="/w/Iron_Chain" title="Iron Chain">Iron Chain</a>'
+        soup = BeautifulSoup(html, "lxml")
+        link = soup.find("a")
+
+        item = extract_item_from_link(link)
+
+        assert item is not None
+        assert item.name == "Iron Chain"
+
+    def test_allows_copper_items(self):
+        """Test that Java Edition copper items are NOT filtered despite 'Copper' being in blacklist."""
+        html = '<a href="/w/Copper_Ingot" title="Copper Ingot">Copper Ingot</a>'
+        soup = BeautifulSoup(html, "lxml")
+        link = soup.find("a")
+
+        item = extract_item_from_link(link)
+
+        assert item is not None
+        assert item.name == "Copper Ingot"
+
+    def test_detects_inline_edition_markers(self):
+        """Test that inline edition markers in table cells are detected."""
+        html = '''
+        <table>
+            <tr>
+                <td>
+                    <span class="mcui mcui-Crafting_Table pixel-image">
+                        <span class="mcui-output">
+                            <span class="invslot">
+                                <span class="invslot-item">
+                                    <a href="/w/Blue_Sparkler" title="Blue Sparkler">Blue Sparkler</a>
+                                </span>
+                            </span>
+                        </span>
+                    </span>
+                </td>
+                <td>
+                    <sup class="nowrap Inline-Template">
+                        [<i><span title="This statement only applies to Bedrock Edition and Minecraft Education">
+                        <a href="/w/Bedrock_Edition">Bedrock Edition</a> and
+                        <a href="/w/Minecraft_Education">Minecraft Education</a> only</span></i>]
+                    </sup>
+                </td>
+            </tr>
+        </table>
+        '''
+        soup = BeautifulSoup(html, "lxml")
+        element = soup.find("span", class_="mcui")
+
+        assert is_java_edition(element) is False
+
+    def test_allows_normal_table_content(self):
+        """Test that normal table content without edition markers is accepted."""
+        html = '''
+        <table>
+            <tr>
+                <td>
+                    <span class="mcui mcui-Crafting_Table pixel-image">
+                        <span class="mcui-output">
+                            <span class="invslot">
+                                <span class="invslot-item">
+                                    <a href="/w/Iron_Ingot" title="Iron Ingot">Iron Ingot</a>
+                                </span>
+                            </span>
+                        </span>
+                    </span>
+                </td>
+                <td>Regular crafting recipe</td>
+            </tr>
+        </table>
+        '''
+        soup = BeautifulSoup(html, "lxml")
+        element = soup.find("span", class_="mcui")
+
+        assert is_java_edition(element) is True

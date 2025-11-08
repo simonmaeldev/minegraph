@@ -12,7 +12,6 @@ from src.visualize_graph_3d import (
     build_graph_from_csv,
     calculate_node_sizes,
     compute_3d_layout,
-    create_image_plane,
     get_edge_colors,
     load_color_config,
     load_item_image,
@@ -872,25 +871,6 @@ class TestImageFunctionality:
             assert "Iron Ingot" in cache
             assert cache["Iron Ingot"] is not None
 
-    def test_create_image_plane_basic(self):
-        """Test creating image plane in 3D space."""
-        import matplotlib
-        matplotlib.use('Agg')
-        import matplotlib.pyplot as plt
-        import numpy as np
-
-        # Create a simple test image
-        test_img = np.ones((10, 10, 3))
-
-        # Create 3D axes
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-
-        # Should not raise errors
-        create_image_plane(ax, test_img, (0, 0, 0), 100)
-
-        plt.close(fig)
-
     def test_render_with_images_enabled(self):
         """Test rendering with image mode enabled but no images available."""
         import matplotlib
@@ -941,3 +921,47 @@ class TestImageFunctionality:
 
         fig = plt.gcf()
         plt.close(fig)
+
+    def test_render_image_updates_on_zoom(self):
+        """Test that zoom event handlers are connected when images are enabled."""
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        from PIL import Image
+        import tempfile
+
+        # Create a temporary image file
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a simple test image
+            test_img = Image.new('RGB', (10, 10), color=(255, 0, 0))
+            img_path = Path(tmpdir) / "item1.png"
+            test_img.save(img_path)
+
+            graph = nx.DiGraph()
+            graph.add_node('Item1', node_type='item')
+            graph.add_node('Item2', node_type='item')
+            graph.add_edge('Item1', 'Item2', transformation_type='crafting')
+
+            pos = {'Item1': (0, 0, 0), 'Item2': (1, 1, 1)}
+            node_sizes = {'Item1': 50, 'Item2': 50}
+            edge_colors = ['#4A90E2']
+            color_config = {'crafting': '#4A90E2'}
+
+            # Render with images enabled
+            render_3d_graph(
+                graph, pos, node_sizes, edge_colors, color_config,
+                use_images=True,
+                images_dir=tmpdir
+            )
+
+            fig = plt.gcf()
+
+            # Verify button_release_event handler is connected
+            callbacks = fig.canvas.callbacks.callbacks.get('button_release_event', {})
+            assert len(callbacks) > 0, "No button_release_event handler connected for zoom updates"
+
+            # Verify draw_event handler is still connected (for rotation/pan)
+            draw_callbacks = fig.canvas.callbacks.callbacks.get('draw_event', {})
+            assert len(draw_callbacks) > 0, "No draw_event handler connected"
+
+            plt.close(fig)

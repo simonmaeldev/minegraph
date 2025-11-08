@@ -65,3 +65,14 @@ This prompt helps you determine what documentation you should read based on the 
     - When implementing hit testing with scatter plot contains() method
     - When enhancing user interaction in 3D visualizations
 
+- app_docs/feature-image-based-3d-nodes.md
+  - Conditions:
+    - When working with image-based node rendering in 3D visualizations
+    - When implementing camera-facing billboards or image annotations in matplotlib 3D
+    - When using AnnotationBbox, OffsetImage, or proj3d for 3D-to-2D projection
+    - When troubleshooting image positioning during camera rotation or view changes
+    - When implementing draw event handlers to update visual elements dynamically
+    - When working with hybrid rendering (images + fallback shapes)
+    - When loading and caching item images for graph nodes
+    - When scaling images based on node importance or centrality
+

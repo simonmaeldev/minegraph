@@ -4,6 +4,7 @@ import re
 from typing import List, Optional
 from bs4 import BeautifulSoup, Tag
 from .data_models import Item, Transformation, TransformationType
+from .education_edition_blacklist import is_education_edition_item
 
 
 # Excluded sections for crafting parser (historical/obsolete recipes)
@@ -47,6 +48,14 @@ def is_java_edition(element: Tag) -> bool:
             if ("bedrock edition" in cell_text or "bedrock" in cell_text) and \
                ("education" in cell_text or "minecraft education" in cell_text):
                 return False
+
+            # Check for inline edition markers (sup with Inline-Template class)
+            # Pattern: <sup class="nowrap Inline-Template">...[Bedrock Edition and Minecraft Education only]</sup>
+            sup_markers = cell.find_all("sup", class_="Inline-Template")
+            for sup in sup_markers:
+                sup_text = sup.get_text().lower()
+                if ("bedrock" in sup_text or "education" in sup_text or "minecraft education" in sup_text) and "only" in sup_text:
+                    return False
 
     return True
 
@@ -113,6 +122,32 @@ def extract_item_from_link(link_tag: Tag) -> Optional[Item]:
     if not href or not href.startswith("/w/"):
         return None
 
+    # Check if link is within an infobox or metadata section
+    # These are captions/metadata, not actual game items
+    parent = link_tag.parent
+    while parent:
+        # Check for infobox-related classes
+        parent_classes = parent.get("class", [])
+        if isinstance(parent_classes, list):
+            if any(cls in parent_classes for cls in ["infobox-imagecaption", "infobox", "notaninfobox"]):
+                return None
+        parent = parent.parent
+
+    # Check for inline edition markers next to this link (e.g., in same <li> or <td>)
+    # Pattern: <a href="/w/Item">Item</a>‌<sup class="Inline-Template">[BE only]</sup>
+    # Check both <li> (for list-based tables) and <td> (for regular tables)
+    for parent_type in ["li", "td"]:
+        parent_element = link_tag.find_parent(parent_type)
+        if parent_element:
+            # Look for sup elements with Inline-Template class in this parent
+            sup_markers = parent_element.find_all("sup", class_="Inline-Template")
+            for sup in sup_markers:
+                sup_text = sup.get_text().lower()
+                # Check for Bedrock/Education edition markers
+                # BE = Bedrock Edition abbreviation
+                if ("bedrock" in sup_text or "education" in sup_text or ("be" in sup_text and "only" in sup_text)):
+                    return None
+
     # Extract name from href (remove /w/ prefix and decode underscores)
     name = href[3:].replace("_", " ")
 
@@ -120,6 +155,10 @@ def extract_item_from_link(link_tag: Tag) -> Optional[Item]:
     title = link_tag.get("title", "")
     if title:
         name = title
+
+    # Filter out Education Edition items
+    if is_education_edition_item(name):
+        return None
 
     # Construct full URL
     url = f"https://minecraft.wiki{href}"
