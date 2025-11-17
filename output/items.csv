@@ -78,12 +78,15 @@ Bamboo Sign,https://minecraft.wiki/w/Bamboo_Sign
 Bamboo Slab,https://minecraft.wiki/w/Bamboo_Slab
 Bamboo Stairs,https://minecraft.wiki/w/Bamboo_Stairs
 Bamboo Trapdoor,https://minecraft.wiki/w/Bamboo_Trapdoor
+Banner,https://minecraft.wiki/w/Banner
 Barrel,https://minecraft.wiki/w/Barrel
 Basalt,https://minecraft.wiki/w/Basalt
 Beacon,https://minecraft.wiki/w/Beacon
+Bed,https://minecraft.wiki/w/Bed
 Beehive,https://minecraft.wiki/w/Beehive
 Beetroot,https://minecraft.wiki/w/Beetroot
 Beetroot Soup,https://minecraft.wiki/w/Beetroot_Soup
+Bell,https://minecraft.wiki/w/Bell
 Birch Boat,https://minecraft.wiki/w/Birch_Boat
 Birch Boat with Chest,https://minecraft.wiki/w/Birch_Boat_with_Chest
 Birch Button,https://minecraft.wiki/w/Birch_Button
@@ -156,6 +159,7 @@ Blue Stained Glass,https://minecraft.wiki/w/Blue_Stained_Glass
 Blue Stained Glass Pane,https://minecraft.wiki/w/Blue_Stained_Glass_Pane
 Blue Terracotta,https://minecraft.wiki/w/Blue_Terracotta
 Blue Wool,https://minecraft.wiki/w/Blue_Wool
+Boat,https://minecraft.wiki/w/Boat
 Bolt Armor Trim,https://minecraft.wiki/w/Bolt_Armor_Trim_Smithing_Template
 Bone,https://minecraft.wiki/w/Bone
 Bone Block,https://minecraft.wiki/w/Bone_Block
@@ -164,6 +168,7 @@ Book,https://minecraft.wiki/w/Book
 Book and Quill,https://minecraft.wiki/w/Book_and_Quill
 Bookshelf,https://minecraft.wiki/w/Bookshelf
 Bordure Indented Banner Pattern,https://minecraft.wiki/w/Bordure_Indented_Banner_Pattern
+Bottle o' Enchanting,https://minecraft.wiki/w/Bottle_o%27_Enchanting
 Bow,https://minecraft.wiki/w/Bow
 Bowl,https://minecraft.wiki/w/Bowl
 Bread,https://minecraft.wiki/w/Bread
@@ -193,6 +198,7 @@ Brown Terracotta,https://minecraft.wiki/w/Brown_Terracotta
 Brown Wool,https://minecraft.wiki/w/Brown_Wool
 Brush,https://minecraft.wiki/w/Brush
 Bucket,https://minecraft.wiki/w/Bucket
+Bucket of Cod,https://minecraft.wiki/w/Bucket_of_Cod
 Bundle,https://minecraft.wiki/w/Bundle
 Burn Pottery Sherd,https://minecraft.wiki/w/Burn_Pottery_Sherd
 Cactus,https://minecraft.wiki/w/Cactus
@@ -415,7 +421,13 @@ Egg,https://minecraft.wiki/w/Egg
 Emerald,https://minecraft.wiki/w/Emerald
 Emerald Ore,https://minecraft.wiki/w/Emerald_Ore
 Empty Map,https://minecraft.wiki/w/Empty_Map
+Enchanted Bow,https://minecraft.wiki/w/Enchanted_Bow
+Enchanted Crossbow,https://minecraft.wiki/w/Enchanted_Crossbow
+Enchanted Diamond Axe,https://minecraft.wiki/w/Enchanted_Diamond_Axe
+Enchanted Fishing Rod,https://minecraft.wiki/w/Enchanted_Fishing_Rod
 Enchanted Golden Apple,https://minecraft.wiki/w/Enchanted_Golden_Apple
+Enchanted Iron Axe,https://minecraft.wiki/w/Enchanted_Iron_Axe
+Enchanted Iron Sword,https://minecraft.wiki/w/Enchanted_Iron_Sword
 Enchanting Table,https://minecraft.wiki/w/Enchanting_Table
 End Crystal,https://minecraft.wiki/w/End_Crystal
 End Rod,https://minecraft.wiki/w/End_Rod
@@ -426,6 +438,7 @@ End Stone Brick Wall,https://minecraft.wiki/w/End_Stone_Brick_Wall
 End Stone Bricks,https://minecraft.wiki/w/End_Stone_Bricks
 Ender Chest,https://minecraft.wiki/w/Ender_Chest
 Ender Pearl,https://minecraft.wiki/w/Ender_Pearl
+Explorer Map,https://minecraft.wiki/w/Explorer_Map
 Explorer Pottery Sherd,https://minecraft.wiki/w/Explorer_Pottery_Sherd
 Exposed Chiseled Copper,https://minecraft.wiki/w/Exposed_Chiseled_Copper
 Exposed Copper,https://minecraft.wiki/w/Exposed_Copper
@@ -1051,10 +1064,12 @@ Spruce Stairs,https://minecraft.wiki/w/Spruce_Stairs
 Spruce Trapdoor,https://minecraft.wiki/w/Spruce_Trapdoor
 Spruce Wood,https://minecraft.wiki/w/Spruce_Wood
 Spyglass,https://minecraft.wiki/w/Spyglass
+Stained Terracotta,https://minecraft.wiki/w/Stained_Terracotta
 Steak,https://minecraft.wiki/w/Steak
 Stick,https://minecraft.wiki/w/Stick
 Sticky Piston,https://minecraft.wiki/w/Sticky_Piston
 Stone,https://minecraft.wiki/w/Stone
+Stone Axe,https://minecraft.wiki/w/Stone_Axe
 Stone Brick Slab,https://minecraft.wiki/w/Stone_Brick_Slab
 Stone Brick Stairs,https://minecraft.wiki/w/Stone_Brick_Stairs
 Stone Brick Wall,https://minecraft.wiki/w/Stone_Brick_Wall
@@ -1103,6 +1118,7 @@ Tipped Arrow,https://minecraft.wiki/w/Tipped_Arrow
 Torch,https://minecraft.wiki/w/Torch
 Torchflower,https://minecraft.wiki/w/Torchflower
 Trapped Chest,https://minecraft.wiki/w/Trapped_Chest
+Trial Explorer Map,https://minecraft.wiki/w/Trial_Explorer_Map
 Tripwire Hook,https://minecraft.wiki/w/Tripwire_Hook
 Tuff,https://minecraft.wiki/w/Tuff
 Tuff Brick Slab,https://minecraft.wiki/w/Tuff_Brick_Slab
@@ -1240,6 +1256,8 @@ Wooden Pickaxe,https://minecraft.wiki/w/Wooden_Pickaxe
 Wooden Shovel,https://minecraft.wiki/w/Wooden_Shovel
 Wooden Spear,https://minecraft.wiki/w/Wooden_Spear
 Wooden Sword,https://minecraft.wiki/w/Wooden_Sword
+Woodland Explorer Map,https://minecraft.wiki/w/Woodland_Explorer_Map
+Wool,https://minecraft.wiki/w/Wool
 Written Book,https://minecraft.wiki/w/Written_Book
 Yellow Banner,https://minecraft.wiki/w/Yellow_Banner
 Yellow Bed,https://minecraft.wiki/w/Yellow_Bed

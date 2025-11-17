@@ -254,6 +254,218 @@ class TestParsers:
 
         assert isinstance(result, list)
 
+    def test_parse_trading_item_to_emerald(self):
+        """Test parsing an item-to-emerald trade (selling to villager)."""
+        from src.core.parsers import parse_trading
+        from src.core.data_models import TransformationType
+
+        html = '''
+        <table class="wikitable" style="text-align:center">
+            <tbody>
+                <tr>
+                    <th colspan="9" data-description="Armorer">
+                        <span class="nowrap">
+                            <a href="/w/Armorer" title="Armorer">
+                                <span class="sprite-text">Armorer</span>
+                            </a>
+                        </span>
+                    </th>
+                </tr>
+                <tr>
+                    <th rowspan="2">Level</th>
+                    <th><i><a href="/w/Java_Edition" title="Java Edition">Java Edition</a></i></th>
+                    <th rowspan="2">Item wanted</th>
+                    <th rowspan="2">Item given</th>
+                </tr>
+                <tr>
+                    <th>Probability</th>
+                </tr>
+                <tr>
+                    <th>Novice</th>
+                    <td>40%</td>
+                    <td>15 × <span class="nowrap">
+                        <a href="/w/Coal" title="Coal">
+                            <span class="sprite-text">Coal</span>
+                        </a>
+                    </span></td>
+                    <td><span class="nowrap">
+                        <a href="/w/Emerald" title="Emerald">
+                            <span class="sprite-text">Emerald</span>
+                        </a>
+                    </span></td>
+                </tr>
+            </tbody>
+        </table>
+        '''
+
+        result = parse_trading(html)
+
+        assert len(result) == 1
+        assert result[0].transformation_type == TransformationType.TRADING
+        # Note: Transformation deduplicates inputs, so 15 Coal becomes 1 Coal in the graph
+        assert len(result[0].inputs) == 1
+        assert result[0].inputs[0].name == "Coal"
+        assert len(result[0].outputs) == 1
+        assert result[0].outputs[0].name == "Emerald"
+        assert result[0].metadata["villager_type"] == "Armorer"
+        assert result[0].metadata["level"] == "Novice"
+
+    def test_parse_trading_emerald_to_item(self):
+        """Test parsing an emerald-to-item trade (buying from villager)."""
+        from src.core.parsers import parse_trading
+        from src.core.data_models import TransformationType
+
+        html = '''
+        <table class="wikitable" style="text-align:center">
+            <tbody>
+                <tr>
+                    <th colspan="9" data-description="Armorer">
+                        <span class="nowrap">
+                            <a href="/w/Armorer" title="Armorer">
+                                <span class="sprite-text">Armorer</span>
+                            </a>
+                        </span>
+                    </th>
+                </tr>
+                <tr>
+                    <th rowspan="2">Level</th>
+                    <th><i><a href="/w/Java_Edition" title="Java Edition">Java Edition</a></i></th>
+                    <th rowspan="2">Item wanted</th>
+                    <th rowspan="2">Item given</th>
+                </tr>
+                <tr>
+                    <th>Probability</th>
+                </tr>
+                <tr>
+                    <th>Apprentice</th>
+                    <td>40%</td>
+                    <td>5 × <span class="nowrap">
+                        <a href="/w/Emerald" title="Emerald">
+                            <span class="sprite-text">Emerald</span>
+                        </a>
+                    </span></td>
+                    <td><span class="nowrap">
+                        <a href="/w/Iron_Helmet" title="Iron Helmet">
+                            <span class="sprite-text">Iron Helmet</span>
+                        </a>
+                    </span></td>
+                </tr>
+            </tbody>
+        </table>
+        '''
+
+        result = parse_trading(html)
+
+        assert len(result) == 1
+        assert result[0].transformation_type == TransformationType.TRADING
+        # Note: Transformation deduplicates inputs, so 5 Emeralds becomes 1 Emerald in the graph
+        assert len(result[0].inputs) == 1
+        assert result[0].inputs[0].name == "Emerald"
+        assert len(result[0].outputs) == 1
+        assert result[0].outputs[0].name == "Iron Helmet"
+        assert result[0].metadata["villager_type"] == "Armorer"
+        assert result[0].metadata["level"] == "Apprentice"
+
+    def test_parse_trading_no_quantity_multiplier(self):
+        """Test parsing a trade without quantity multiplier."""
+        from src.core.parsers import parse_trading
+
+        html = '''
+        <table class="wikitable" style="text-align:center">
+            <tbody>
+                <tr>
+                    <th colspan="9" data-description="Toolsmith">
+                        <span class="nowrap">
+                            <a href="/w/Toolsmith" title="Toolsmith">
+                                <span class="sprite-text">Toolsmith</span>
+                            </a>
+                        </span>
+                    </th>
+                </tr>
+                <tr>
+                    <th rowspan="2">Level</th>
+                    <th><i><a href="/w/Java_Edition" title="Java Edition">Java Edition</a></i></th>
+                    <th rowspan="2">Item wanted</th>
+                    <th rowspan="2">Item given</th>
+                </tr>
+                <tr>
+                    <th>Probability</th>
+                </tr>
+                <tr>
+                    <th>Journeyman</th>
+                    <td>40%</td>
+                    <td><span class="nowrap">
+                        <a href="/w/Diamond" title="Diamond">
+                            <span class="sprite-text">Diamond</span>
+                        </a>
+                    </span></td>
+                    <td><span class="nowrap">
+                        <a href="/w/Emerald" title="Emerald">
+                            <span class="sprite-text">Emerald</span>
+                        </a>
+                    </span></td>
+                </tr>
+            </tbody>
+        </table>
+        '''
+
+        result = parse_trading(html)
+
+        assert len(result) == 1
+        assert len(result[0].inputs) == 1  # 1 Diamond (default quantity)
+        assert result[0].inputs[0].name == "Diamond"
+        assert len(result[0].outputs) == 1
+        assert result[0].outputs[0].name == "Emerald"
+        assert result[0].metadata["level"] == "Journeyman"
+
+    def test_parse_trading_filters_bedrock_edition(self):
+        """Test that parse_trading filters out Bedrock Edition trades."""
+        from src.core.parsers import parse_trading
+
+        html = '''
+        <table class="wikitable" style="text-align:center">
+            <tbody>
+                <tr>
+                    <th colspan="9" data-description="Farmer">
+                        <span class="nowrap">
+                            <a href="/w/Farmer" title="Farmer">
+                                <span class="sprite-text">Farmer</span>
+                            </a>
+                        </span>
+                    </th>
+                </tr>
+                <tr>
+                    <th rowspan="2">Level</th>
+                    <th><i><a href="/w/Bedrock_Edition" title="Bedrock Edition">Bedrock Edition</a></i></th>
+                    <th rowspan="2">Item wanted</th>
+                    <th rowspan="2">Item given</th>
+                </tr>
+                <tr>
+                    <th>Probability</th>
+                </tr>
+                <tr>
+                    <th>Novice</th>
+                    <td>50%</td>
+                    <td>20 × <span class="nowrap">
+                        <a href="/w/Wheat" title="Wheat">
+                            <span class="sprite-text">Wheat</span>
+                        </a>
+                    </span></td>
+                    <td><span class="nowrap">
+                        <a href="/w/Emerald" title="Emerald">
+                            <span class="sprite-text">Emerald</span>
+                        </a>
+                    </span></td>
+                </tr>
+            </tbody>
+        </table>
+        '''
+
+        result = parse_trading(html)
+
+        # Should be empty because it's Bedrock Edition
+        assert len(result) == 0
+
     def test_parse_mob_drops_simple(self):
         """Test parsing mob drops."""
         from src.core.parsers import parse_mob_drops

@@ -693,14 +693,19 @@ def parse_trading(html_content: str) -> List[Transformation]:
     tables = soup.find_all("table", class_="wikitable")
 
     for table in tables:
-        if not is_java_edition(table):
-            continue
+        # Try to find villager type from the table header with data-description attribute
+        villager_header = table.find("th", attrs={"data-description": True})
+        villager_type = villager_header.get("data-description", "Unknown") if villager_header else "Unknown"
 
-        # Try to find villager type from data attribute or context
-        villager_type = table.get("data-description", "Unknown")
+        # Find the header row that contains "Item wanted" and "Item given"
+        # These are in a row with rowspan="2", not the first row
+        header_row = None
+        for tr in table.find_all("tr"):
+            headers = [th.get_text(strip=True) for th in tr.find_all("th")]
+            if "Item wanted" in headers and "Item given" in headers:
+                header_row = tr
+                break
 
-        # Find header row to identify columns
-        header_row = table.find("tr")
         if not header_row:
             continue
 
@@ -722,11 +727,45 @@ def parse_trading(html_content: str) -> List[Transformation]:
             except StopIteration:
                 continue
 
-        # Parse data rows
-        data_rows = table.find_all("tr")[1:]  # Skip header
+        # Find Java Edition column index if present (for tables with both Bedrock and Java columns)
+        # Also check if table has ONLY Bedrock Edition column (should skip entire table)
+        # Look for header cells with "Java Edition" or "Bedrock Edition" links
+        java_col_idx = None
+        bedrock_col_idx = None
+        for i, th in enumerate(header_row.find_all(["th", "td"])):
+            th_text = th.get_text()
+            if "Java Edition" in th_text:
+                java_col_idx = i
+            if "Bedrock Edition" in th_text:
+                bedrock_col_idx = i
+
+        # Skip tables that only have Bedrock Edition column (no Java Edition column)
+        if bedrock_col_idx is not None and java_col_idx is None:
+            continue
+
+        # Parse data rows - only rows that come after the header row with "Item wanted"
+        all_rows = table.find_all("tr")
+        header_idx = all_rows.index(header_row)
+        data_rows = all_rows[header_idx + 1:]
 
         for row in data_rows:
-            cells = row.find_all("td")
+            # Check if this row is for Java Edition
+            # If table has separate columns for editions, check the Java Edition column
+            if java_col_idx is not None:
+                # Row must have data in the Java Edition column
+                cells_for_edition_check = row.find_all(["th", "td"])
+                if len(cells_for_edition_check) <= java_col_idx:
+                    continue
+                # The Java Edition column should have probability/data, not be empty
+                java_cell = cells_for_edition_check[java_col_idx]
+                if not java_cell.get_text(strip=True):
+                    continue
+            else:
+                # No edition columns at all, use standard is_java_edition check
+                if not is_java_edition(row):
+                    continue
+            # Find all cells - both th and td (level column is often th)
+            cells = row.find_all(["th", "td"])
             if len(cells) <= max(wanted_idx, given_idx):
                 continue
 
@@ -734,33 +773,78 @@ def parse_trading(html_content: str) -> List[Transformation]:
             wanted_cell = cells[wanted_idx]
             input_items: List[Item] = []
 
-            # Parse items from cell
+            # Get full cell text to extract quantities
+            cell_text = wanted_cell.get_text(strip=True)
+
+            # Parse items from cell - handle multiple items and quantities
+            # Pattern: "15 × Coal" or "Emerald" or "Emerald + Book"
             links = wanted_cell.find_all("a", href=re.compile(r"^/w/"))
-            for link in links:
-                item = extract_item_from_link(link)
+
+            if len(links) == 1:
+                # Single item - check for quantity prefix
+                item = extract_item_from_link(links[0])
                 if item:
-                    # Check for quantity
-                    text = wanted_cell.get_text()
-                    quantity = parse_quantity(text)
-                    # Add item multiple times for quantity (simplified)
-                    for _ in range(min(quantity, 1)):  # Just once for graph
+                    quantity = parse_quantity(cell_text)
+                    # Add item multiple times to represent quantity
+                    for _ in range(quantity):
                         input_items.append(item)
+            else:
+                # Multiple items in cell (e.g., "Emerald + Book")
+                for link in links:
+                    item = extract_item_from_link(link)
+                    if item:
+                        # Try to find quantity for this specific item by looking at text before it
+                        # Get the item's link HTML position to find preceding text
+                        link_str = str(link)
+                        link_pos = str(wanted_cell).find(link_str)
+                        if link_pos > 0:
+                            # Get text before this link
+                            preceding = str(wanted_cell)[:link_pos]
+                            # Extract last quantity pattern before this link
+                            quantity_match = re.findall(r'(\d+)\s*[×x]', preceding)
+                            if quantity_match:
+                                quantity = int(quantity_match[-1])
+                            else:
+                                quantity = 1
+                        else:
+                            quantity = 1
+
+                        for _ in range(quantity):
+                            input_items.append(item)
 
             # Extract output items (given)
             given_cell = cells[given_idx]
             output_items: List[Item] = []
 
+            # Get full cell text for output quantities
+            output_text = given_cell.get_text(strip=True)
+
             links = given_cell.find_all("a", href=re.compile(r"^/w/"))
-            for link in links:
-                item = extract_item_from_link(link)
-                if item:
-                    output_items.append(item)
+            if links:
+                # Parse output - similar logic for quantity
+                if len(links) == 1:
+                    item = extract_item_from_link(links[0])
+                    if item:
+                        quantity = parse_quantity(output_text)
+                        # Add item multiple times to represent quantity
+                        for _ in range(quantity):
+                            output_items.append(item)
+                else:
+                    # Multiple output items
+                    for link in links:
+                        item = extract_item_from_link(link)
+                        if item:
+                            output_items.append(item)
 
             if input_items and output_items:
-                # Try to get level from first column
+                # Try to get level from row - look for level column
                 level = "Unknown"
+                # The first cell often contains the level (e.g., "Novice", "Apprentice")
                 if len(cells) > 0:
-                    level = cells[0].get_text(strip=True)
+                    first_cell_text = cells[0].get_text(strip=True)
+                    # Check if it's a valid level name
+                    if first_cell_text in ["Novice", "Apprentice", "Journeyman", "Expert", "Master"]:
+                        level = first_cell_text
 
                 transformations.append(
                     Transformation(
