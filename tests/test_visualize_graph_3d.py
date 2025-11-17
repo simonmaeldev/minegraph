@@ -3,6 +3,8 @@
 import json
 import tempfile
 from pathlib import Path
+from unittest.mock import Mock, patch, MagicMock
+from argparse import Namespace
 
 import pytest
 import networkx as nx
@@ -11,11 +13,15 @@ from src.visualize_graph_3d import (
     Graph3DBuilder,
     build_graph_from_csv,
     calculate_node_sizes,
+    collect_options,
     compute_3d_layout,
     get_edge_colors,
     load_color_config,
     load_item_image,
+    load_transformation_types,
     load_transformations_from_csv,
+    prompt_boolean_options,
+    prompt_transformation_types,
     render_3d_graph,
     standardize_filename,
 )
@@ -965,3 +971,337 @@ class TestImageFunctionality:
             assert len(draw_callbacks) > 0, "No draw_event handler connected"
 
             plt.close(fig)
+
+
+class TestLoadTransformationTypes:
+    """Test cases for loading unique transformation types from CSV."""
+
+    def test_load_types_from_valid_csv(self):
+        """Test loading transformation types from valid CSV."""
+        csv_content = """transformation_type,input_items,output_items,metadata
+crafting,"[""Oak Planks""]","[""Stick""]","{}"
+smelting,"[""Iron Ore""]","[""Iron Ingot""]","{}"
+crafting,"[""Stick""]","[""Tool""]","{}"
+brewing,"[""Water Bottle""]","[""Potion""]","{}"
+"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+            f.write(csv_content)
+            temp_path = f.name
+
+        try:
+            types = load_transformation_types(temp_path)
+            assert len(types) == 3  # crafting, smelting, brewing (unique)
+            assert 'crafting' in types
+            assert 'smelting' in types
+            assert 'brewing' in types
+            # Verify sorted order
+            assert types == sorted(types)
+        finally:
+            Path(temp_path).unlink()
+
+    def test_load_types_from_empty_csv(self):
+        """Test loading types from empty CSV."""
+        csv_content = """transformation_type,input_items,output_items,metadata
+"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+            f.write(csv_content)
+            temp_path = f.name
+
+        try:
+            types = load_transformation_types(temp_path)
+            assert len(types) == 0
+        finally:
+            Path(temp_path).unlink()
+
+    def test_load_types_from_nonexistent_file(self):
+        """Test loading types from nonexistent file."""
+        types = load_transformation_types('/nonexistent/path.csv')
+        assert len(types) == 0
+
+
+class TestTransformationFiltering:
+    """Test cases for filtering transformations by type."""
+
+    def test_load_with_filter(self):
+        """Test loading transformations with type filter."""
+        csv_content = """transformation_type,input_items,output_items,metadata
+crafting,"[""Oak Planks""]","[""Stick""]","{}"
+smelting,"[""Iron Ore""]","[""Iron Ingot""]","{}"
+crafting,"[""Stick""]","[""Tool""]","{}"
+brewing,"[""Water Bottle""]","[""Potion""]","{}"
+"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+            f.write(csv_content)
+            temp_path = f.name
+
+        try:
+            # Filter for only crafting
+            transformations = load_transformations_from_csv(temp_path, filter_types=['crafting'])
+            assert len(transformations) == 2
+            assert all(t['transformation_type'] == 'crafting' for t in transformations)
+
+            # Filter for smelting and brewing
+            transformations = load_transformations_from_csv(temp_path, filter_types=['smelting', 'brewing'])
+            assert len(transformations) == 2
+            types = [t['transformation_type'] for t in transformations]
+            assert 'smelting' in types
+            assert 'brewing' in types
+            assert 'crafting' not in types
+        finally:
+            Path(temp_path).unlink()
+
+    def test_load_without_filter(self):
+        """Test loading transformations without filter (all types)."""
+        csv_content = """transformation_type,input_items,output_items,metadata
+crafting,"[""Oak Planks""]","[""Stick""]","{}"
+smelting,"[""Iron Ore""]","[""Iron Ingot""]","{}"
+brewing,"[""Water Bottle""]","[""Potion""]","{}"
+"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+            f.write(csv_content)
+            temp_path = f.name
+
+        try:
+            transformations = load_transformations_from_csv(temp_path, filter_types=None)
+            assert len(transformations) == 3
+        finally:
+            Path(temp_path).unlink()
+
+    def test_build_graph_with_filter(self):
+        """Test building graph with type filtering."""
+        csv_content = """transformation_type,input_items,output_items,metadata
+crafting,"[""Oak Planks""]","[""Stick""]","{}"
+smelting,"[""Iron Ore""]","[""Iron Ingot""]","{}"
+crafting,"[""Stick""]","[""Tool""]","{}"
+"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+            f.write(csv_content)
+            temp_path = f.name
+
+        try:
+            color_config = {'crafting': '#4A90E2', 'smelting': '#E67E22'}
+
+            # Build graph with only crafting transformations
+            graph = build_graph_from_csv(temp_path, color_config, filter_types=['crafting'])
+
+            # Should have 3 item nodes: Oak Planks, Stick, Tool
+            # And 2 edges for the two crafting transformations
+            assert graph.number_of_nodes() == 3
+            assert graph.number_of_edges() == 2
+
+            # Verify no smelting items
+            assert not graph.has_node('Iron Ore')
+            assert not graph.has_node('Iron Ingot')
+        finally:
+            Path(temp_path).unlink()
+
+
+class TestInteractiveOptions:
+    """Test cases for interactive option collection."""
+
+    @patch('src.visualize_graph_3d.FzfPrompt')
+    def test_prompt_boolean_options_with_selections(self, mock_fzf_class):
+        """Test prompting for boolean options with user selections."""
+        mock_fzf = Mock()
+        mock_fzf_class.return_value = mock_fzf
+        mock_fzf.prompt.return_value = [
+            "use-images: Use item images instead of spheres",
+            "verbose: Enable verbose logging"
+        ]
+
+        result = prompt_boolean_options()
+
+        assert result['use_images'] is True
+        assert result['verbose'] is True
+
+    @patch('src.visualize_graph_3d.FzfPrompt')
+    def test_prompt_boolean_options_no_selections(self, mock_fzf_class):
+        """Test prompting for boolean options with no selections."""
+        mock_fzf = Mock()
+        mock_fzf_class.return_value = mock_fzf
+        mock_fzf.prompt.return_value = []
+
+        result = prompt_boolean_options()
+
+        assert result['use_images'] is False
+        assert result['verbose'] is False
+
+    @patch('src.visualize_graph_3d.FzfPrompt')
+    def test_prompt_boolean_options_partial_selections(self, mock_fzf_class):
+        """Test prompting for boolean options with partial selections."""
+        mock_fzf = Mock()
+        mock_fzf_class.return_value = mock_fzf
+        mock_fzf.prompt.return_value = ["verbose: Enable verbose logging"]
+
+        result = prompt_boolean_options()
+
+        assert result['use_images'] is False
+        assert result['verbose'] is True
+
+    @patch('src.visualize_graph_3d.FzfPrompt')
+    def test_prompt_transformation_types_with_selections(self, mock_fzf_class):
+        """Test prompting for transformation types with selections."""
+        csv_content = """transformation_type,input_items,output_items,metadata
+crafting,"[""Oak Planks""]","[""Stick""]","{}"
+smelting,"[""Iron Ore""]","[""Iron Ingot""]","{}"
+brewing,"[""Water Bottle""]","[""Potion""]","{}"
+"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+            f.write(csv_content)
+            temp_path = f.name
+
+        try:
+            mock_fzf = Mock()
+            mock_fzf_class.return_value = mock_fzf
+            mock_fzf.prompt.return_value = ["crafting", "smelting"]
+
+            result = prompt_transformation_types(temp_path)
+
+            assert result == ["crafting", "smelting"]
+        finally:
+            Path(temp_path).unlink()
+
+    @patch('src.visualize_graph_3d.FzfPrompt')
+    def test_prompt_transformation_types_all_selected(self, mock_fzf_class):
+        """Test prompting for transformation types with 'All types' selected."""
+        csv_content = """transformation_type,input_items,output_items,metadata
+crafting,"[""Oak Planks""]","[""Stick""]","{}"
+smelting,"[""Iron Ore""]","[""Iron Ingot""]","{}"
+"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+            f.write(csv_content)
+            temp_path = f.name
+
+        try:
+            mock_fzf = Mock()
+            mock_fzf_class.return_value = mock_fzf
+            mock_fzf.prompt.return_value = ["[All types - no filtering]"]
+
+            result = prompt_transformation_types(temp_path)
+
+            assert result is None
+        finally:
+            Path(temp_path).unlink()
+
+    @patch('src.visualize_graph_3d.FzfPrompt')
+    def test_collect_options_no_interactive(self, mock_fzf_class):
+        """Test collect_options with --no-interactive flag."""
+        args = Namespace(
+            use_images=False,
+            verbose=False,
+            filter_type=None,
+            no_interactive=True
+        )
+
+        csv_content = """transformation_type,input_items,output_items,metadata
+crafting,"[""Oak Planks""]","[""Stick""]","{}"
+"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+            f.write(csv_content)
+            temp_path = f.name
+
+        try:
+            result = collect_options(args, temp_path)
+
+            # FZF should not be called at all
+            mock_fzf_class.assert_not_called()
+
+            assert result['use_images'] is False
+            assert result['verbose'] is False
+            assert result['filter_types'] is None
+        finally:
+            Path(temp_path).unlink()
+
+    @patch('src.visualize_graph_3d.FzfPrompt')
+    def test_collect_options_with_cli_args(self, mock_fzf_class):
+        """Test collect_options with CLI args provided (should skip prompts)."""
+        args = Namespace(
+            use_images=True,
+            verbose=True,
+            filter_type='crafting,smelting',
+            no_interactive=False
+        )
+
+        csv_content = """transformation_type,input_items,output_items,metadata
+crafting,"[""Oak Planks""]","[""Stick""]","{}"
+"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+            f.write(csv_content)
+            temp_path = f.name
+
+        try:
+            result = collect_options(args, temp_path)
+
+            # FZF should not be called since all args are provided
+            mock_fzf_class.assert_not_called()
+
+            assert result['use_images'] is True
+            assert result['verbose'] is True
+            assert result['filter_types'] == ['crafting', 'smelting']
+        finally:
+            Path(temp_path).unlink()
+
+    @patch('src.visualize_graph_3d.prompt_transformation_types')
+    @patch('src.visualize_graph_3d.prompt_boolean_options')
+    def test_collect_options_interactive_mode(self, mock_bool_prompt, mock_type_prompt):
+        """Test collect_options in interactive mode."""
+        args = Namespace(
+            use_images=False,
+            verbose=False,
+            filter_type=None,
+            no_interactive=False
+        )
+
+        mock_bool_prompt.return_value = {'use_images': True, 'verbose': False}
+        mock_type_prompt.return_value = ['crafting']
+
+        csv_content = """transformation_type,input_items,output_items,metadata
+crafting,"[""Oak Planks""]","[""Stick""]","{}"
+"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+            f.write(csv_content)
+            temp_path = f.name
+
+        try:
+            result = collect_options(args, temp_path)
+
+            # Both prompts should be called
+            mock_bool_prompt.assert_called_once()
+            mock_type_prompt.assert_called_once_with(temp_path)
+
+            assert result['use_images'] is True
+            assert result['verbose'] is False
+            assert result['filter_types'] == ['crafting']
+        finally:
+            Path(temp_path).unlink()
+
+    @patch('src.visualize_graph_3d.prompt_transformation_types')
+    def test_collect_options_partial_cli_args(self, mock_type_prompt):
+        """Test collect_options with partial CLI args (some prompting needed)."""
+        args = Namespace(
+            use_images=True,  # Provided
+            verbose=False,    # Not provided (default)
+            filter_type=None, # Not provided
+            no_interactive=False
+        )
+
+        mock_type_prompt.return_value = ['smelting']
+
+        csv_content = """transformation_type,input_items,output_items,metadata
+crafting,"[""Oak Planks""]","[""Stick""]","{}"
+"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+            f.write(csv_content)
+            temp_path = f.name
+
+        try:
+            result = collect_options(args, temp_path)
+
+            # Type prompt should be called, but not boolean prompt (use_images was set)
+            mock_type_prompt.assert_called_once_with(temp_path)
+
+            assert result['use_images'] is True
+            assert result['verbose'] is False
+            assert result['filter_types'] == ['smelting']
+        finally:
+            Path(temp_path).unlink()

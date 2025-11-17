@@ -76,3 +76,15 @@ This prompt helps you determine what documentation you should read based on the 
     - When loading and caching item images for graph nodes
     - When scaling images based on node importance or centrality
 
+- app_docs/feature-fzf-interactive-options.md
+  - Conditions:
+    - When implementing interactive CLI option selection with fzf
+    - When working with pyfzf library integration in Python scripts
+    - When adding interactive menus or prompts to command-line tools
+    - When implementing transformation type filtering in visualizations
+    - When working with collect_options() or prompt functions in visualize_graph_3d.py
+    - When troubleshooting interactive mode or --no-interactive flag behavior
+    - When balancing CLI flag precedence with interactive selection
+    - When implementing checkbox or multi-select menus in terminal interfaces
+    - When adding filtering capabilities to graph visualizations
+

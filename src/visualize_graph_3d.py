@@ -4,8 +4,9 @@ import argparse
 import csv
 import json
 import logging
+import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Set
 
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
@@ -15,6 +16,11 @@ from mpl_toolkits.mplot3d import Axes3D, proj3d
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 from matplotlib.widgets import Slider
+
+try:
+    from pyfzf.pyfzf import FzfPrompt
+except ImportError:
+    FzfPrompt = None
 
 
 # Default color mappings if config file is missing or incomplete
@@ -31,6 +37,135 @@ DEFAULT_COLORS = {
     "composting": "#27AE60",
     "grindstone": "#34495E",
 }
+
+
+def prompt_boolean_options() -> Dict[str, bool]:
+    """
+    Present an interactive checkbox menu for boolean flags using fzf.
+
+    Returns:
+        Dictionary with 'use_images' and 'verbose' boolean values
+
+    Raises:
+        SystemExit: If user cancels the selection or fzf is not available
+    """
+    if FzfPrompt is None:
+        logging.error("pyfzf library is not available. Install it with: pip install pyfzf")
+        logging.error("Or use command-line flags to specify options directly.")
+        sys.exit(1)
+
+    try:
+        fzf = FzfPrompt()
+
+        # Define available options with descriptive labels
+        options = [
+            "use-images: Use item images instead of spheres",
+            "verbose: Enable verbose logging"
+        ]
+
+        # Prompt user with multi-select enabled
+        print("\n🎨 Select visualization options (use TAB to select, ENTER to confirm):")
+        selections = fzf.prompt(options, "--multi --height=40%")
+
+        # Parse selections into boolean dictionary
+        result = {
+            'use_images': any('use-images' in s for s in selections),
+            'verbose': any('verbose' in s for s in selections)
+        }
+
+        logging.debug(f"Boolean options selected: {result}")
+        return result
+
+    except (KeyboardInterrupt, Exception) as e:
+        if isinstance(e, KeyboardInterrupt):
+            logging.info("Selection cancelled by user")
+        else:
+            logging.warning(f"FZF selection failed: {e}")
+        sys.exit(0)
+
+
+def load_transformation_types(csv_path: str) -> List[str]:
+    """
+    Extract unique transformation types from CSV file.
+
+    Args:
+        csv_path: Path to transformations CSV file
+
+    Returns:
+        Sorted list of unique transformation types
+    """
+    types = set()
+
+    csv_file = Path(csv_path)
+    if not csv_file.exists():
+        logging.warning(f"CSV file not found: {csv_path}")
+        return []
+
+    try:
+        with open(csv_file, 'r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                if 'transformation_type' in row:
+                    types.add(row['transformation_type'])
+
+        logging.debug(f"Found {len(types)} unique transformation types")
+        return sorted(list(types))
+    except Exception as e:
+        logging.error(f"Error reading transformation types: {e}")
+        return []
+
+
+def prompt_transformation_types(csv_path: str) -> Optional[List[str]]:
+    """
+    Present an interactive multi-select menu for transformation type filtering.
+
+    Args:
+        csv_path: Path to transformations CSV file
+
+    Returns:
+        List of selected transformation types, or None if all types selected
+
+    Raises:
+        SystemExit: If user cancels the selection or fzf is not available
+    """
+    if FzfPrompt is None:
+        logging.error("pyfzf library is not available. Install it with: pip install pyfzf")
+        logging.error("Or use command-line flags to specify options directly.")
+        sys.exit(1)
+
+    # Load available transformation types
+    available_types = load_transformation_types(csv_path)
+
+    if not available_types:
+        logging.warning("No transformation types found in CSV")
+        return None
+
+    try:
+        fzf = FzfPrompt()
+
+        # Add "All types" option at the beginning
+        options = ["[All types - no filtering]"] + available_types
+
+        # Prompt user with multi-select enabled
+        print("\n🔍 Filter by transformation types (use TAB to select, ENTER to confirm):")
+        selections = fzf.prompt(options, "--multi --height=40%")
+
+        # If user selected "All types" or nothing, return None (no filtering)
+        if not selections or any('[All types' in s for s in selections):
+            logging.debug("No transformation type filtering selected")
+            return None
+
+        # Return selected types (filter out the "All types" option if present)
+        selected_types = [s for s in selections if not s.startswith('[')]
+        logging.debug(f"Transformation types selected for filtering: {selected_types}")
+        return selected_types
+
+    except (KeyboardInterrupt, Exception) as e:
+        if isinstance(e, KeyboardInterrupt):
+            logging.info("Selection cancelled by user")
+        else:
+            logging.warning(f"FZF selection failed: {e}")
+        sys.exit(0)
 
 
 def load_color_config(config_path: str) -> Dict[str, str]:
@@ -134,33 +269,50 @@ def load_item_image(
         return None
 
 
-def load_transformations_from_csv(csv_path: str) -> List[Dict]:
+def load_transformations_from_csv(
+    csv_path: str,
+    filter_types: Optional[List[str]] = None
+) -> List[Dict]:
     """
-    Load transformations from CSV file.
+    Load transformations from CSV file with optional type filtering.
 
     Args:
         csv_path: Path to the transformations CSV file
+        filter_types: Optional list of transformation types to include (None = all types)
 
     Returns:
         List of transformation dictionaries with parsed data
     """
     transformations = []
+    total_count = 0
+    filtered_count = 0
 
     csv_file = Path(csv_path)
     if not csv_file.exists():
         raise FileNotFoundError(f"CSV file not found: {csv_path}")
+
+    # Convert filter_types to set for faster lookup
+    filter_set = set(filter_types) if filter_types else None
 
     with open(csv_file, 'r', encoding='utf-8') as f:
         reader = csv.DictReader(f)
         for row in reader:
             # Parse JSON arrays in input_items and output_items
             try:
+                total_count += 1
+                trans_type = row['transformation_type']
+
+                # Apply type filtering if specified
+                if filter_set is not None and trans_type not in filter_set:
+                    filtered_count += 1
+                    continue
+
                 inputs = json.loads(row['input_items'])
                 outputs = json.loads(row['output_items'])
                 metadata = json.loads(row['metadata'])
 
                 transformation = {
-                    'transformation_type': row['transformation_type'],
+                    'transformation_type': trans_type,
                     'input_items': inputs,
                     'output_items': outputs,
                     'metadata': metadata
@@ -170,7 +322,14 @@ def load_transformations_from_csv(csv_path: str) -> List[Dict]:
                 logging.warning(f"Skipping malformed row: {e}")
                 continue
 
-    logging.info(f"Loaded {len(transformations)} transformations from {csv_path}")
+    if filter_types:
+        logging.info(
+            f"Loaded {len(transformations)} transformations from {csv_path} "
+            f"(filtered out {filtered_count} of {total_count} total)"
+        )
+    else:
+        logging.info(f"Loaded {len(transformations)} transformations from {csv_path}")
+
     return transformations
 
 
@@ -260,18 +419,23 @@ class Graph3DBuilder:
         self.add_edge(intermediate, output_item, transformation_type)
 
 
-def build_graph_from_csv(csv_path: str, color_config: Dict[str, str]) -> nx.DiGraph:
+def build_graph_from_csv(
+    csv_path: str,
+    color_config: Dict[str, str],
+    filter_types: Optional[List[str]] = None
+) -> nx.DiGraph:
     """
-    Build NetworkX graph from CSV data.
+    Build NetworkX graph from CSV data with optional type filtering.
 
     Args:
         csv_path: Path to transformations CSV file
         color_config: Color configuration dictionary
+        filter_types: Optional list of transformation types to include
 
     Returns:
         NetworkX DiGraph with all transformations
     """
-    transformations = load_transformations_from_csv(csv_path)
+    transformations = load_transformations_from_csv(csv_path, filter_types)
     builder = Graph3DBuilder()
 
     for trans in transformations:
@@ -712,7 +876,8 @@ def visualize_3d(
     config_path: str,
     output_path: str = None,
     use_images: bool = False,
-    images_dir: str = "images"
+    images_dir: str = "images",
+    filter_types: Optional[List[str]] = None
 ) -> None:
     """
     Generate interactive 3D visualization of transformation graph.
@@ -723,13 +888,14 @@ def visualize_3d(
         output_path: Optional path to save figure (if None, only displays)
         use_images: Whether to use item images instead of spheres
         images_dir: Directory containing item images
+        filter_types: Optional list of transformation types to include
     """
     # Load color configuration
     color_config = load_color_config(config_path)
 
     # Build NetworkX graph from CSV
     logging.info("Building graph from CSV...")
-    graph = build_graph_from_csv(csv_path, color_config)
+    graph = build_graph_from_csv(csv_path, color_config, filter_types)
 
     # Compute 3D layout
     logging.info("Computing 3D layout...")
@@ -761,6 +927,56 @@ def visualize_3d(
     # Display interactive viewer
     logging.info("Opening interactive 3D viewer...")
     plt.show()
+
+
+def collect_options(args, csv_path: str) -> Dict:
+    """
+    Collect visualization options from CLI args and interactive fzf prompts.
+
+    Args:
+        args: Parsed argparse namespace
+        csv_path: Path to CSV file (needed for transformation type discovery)
+
+    Returns:
+        Dictionary containing all collected options
+    """
+    options = {
+        'use_images': args.use_images,
+        'verbose': args.verbose,
+        'filter_types': None
+    }
+
+    # If --no-interactive is set, skip all prompts and use CLI args only
+    if args.no_interactive:
+        # Parse --filter-type if provided
+        if args.filter_type:
+            options['filter_types'] = [t.strip() for t in args.filter_type.split(',')]
+        logging.debug("Interactive mode disabled, using CLI arguments only")
+        return options
+
+    # Check if boolean flags need interactive selection
+    # Only prompt if BOTH flags are False (not explicitly set by user)
+    needs_boolean_prompt = not args.use_images and not args.verbose
+
+    if needs_boolean_prompt:
+        # Interactive prompt for boolean options
+        boolean_opts = prompt_boolean_options()
+        options['use_images'] = boolean_opts['use_images']
+        options['verbose'] = boolean_opts['verbose']
+    else:
+        logging.debug("Using CLI boolean flags, skipping interactive boolean prompt")
+
+    # Check if transformation type filtering needs interactive selection
+    if args.filter_type is None:
+        # Interactive prompt for transformation types
+        filter_types = prompt_transformation_types(csv_path)
+        options['filter_types'] = filter_types
+    else:
+        # Parse CLI filter-type argument
+        options['filter_types'] = [t.strip() for t in args.filter_type.split(',')]
+        logging.debug("Using CLI filter-type, skipping interactive type prompt")
+
+    return options
 
 
 def main():
@@ -804,22 +1020,42 @@ def main():
         help='Directory containing item images (default: images/)'
     )
 
+    parser.add_argument(
+        '--filter-type',
+        help='Filter by transformation types (comma-separated, e.g., "crafting,smelting")'
+    )
+
+    parser.add_argument(
+        '--no-interactive',
+        action='store_true',
+        help='Disable interactive fzf prompts and use defaults/CLI args only'
+    )
+
     args = parser.parse_args()
 
-    # Configure logging
+    # Configure logging with initial level (may be updated by interactive selection)
     log_level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(
         level=log_level,
         format='%(levelname)s: %(message)s'
     )
 
+    # Collect options from CLI args and interactive prompts
+    options = collect_options(args, args.input)
+
+    # Update logging level if verbose was selected interactively
+    if options['verbose'] and not args.verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
+        logging.debug("Verbose logging enabled via interactive selection")
+
     try:
         visualize_3d(
             csv_path=args.input,
             config_path=args.config,
             output_path=args.output,
-            use_images=args.use_images,
-            images_dir=args.images_dir
+            use_images=options['use_images'],
+            images_dir=args.images_dir,
+            filter_types=options['filter_types']
         )
 
         if args.output:

@@ -179,11 +179,17 @@ uv run python src/visualize_graph_with_graphviz.py --help
 Generate an interactive 3D visualization that you can rotate, zoom, and pan:
 
 ```bash
-# Display interactive 3D visualization (default behavior - colored spheres)
+# Interactive mode (default) - displays fzf menu to select options
 uv run python src/visualize_graph_3d.py
 
-# Display with item images instead of spheres (requires downloaded images)
-uv run python src/visualize_graph_3d.py --use-images
+# Bypass interactive mode with direct flags
+uv run python src/visualize_graph_3d.py --use-images --verbose
+
+# Filter by specific transformation types (comma-separated)
+uv run python src/visualize_graph_3d.py --filter-type=crafting,smelting
+
+# Disable interactive prompts (for scripting/automation)
+uv run python src/visualize_graph_3d.py --no-interactive
 
 # Display with images from custom directory
 uv run python src/visualize_graph_3d.py --use-images --images-dir my_images/
@@ -194,18 +200,26 @@ uv run python src/visualize_graph_3d.py -i output/transformations.csv
 # Display with custom color config
 uv run python src/visualize_graph_3d.py -c config/graph_colors.txt
 
-# Display with verbose logging
-uv run python src/visualize_graph_3d.py -v
-
 # Save visualization to file (optional)
 uv run python src/visualize_graph_3d.py -o output/graphs/graph_3d.png
 
-# Full example: images + verbose + save
-uv run python src/visualize_graph_3d.py --use-images -v -o output/graphs/graph_3d_images.png
+# Full example: direct flags + filtering + save
+uv run python src/visualize_graph_3d.py --use-images -v --filter-type=crafting,smelting -o output/graphs/filtered_3d.png
 
 # Show help for all options
 uv run python src/visualize_graph_3d.py --help
 ```
+
+**Interactive Mode (New!):**
+
+When you run the script without flags, an interactive fzf-based menu appears allowing you to:
+- Select visualization options (use-images, verbose) with checkboxes
+- Filter by transformation types (multi-select)
+- Avoid memorizing command-line flags
+
+To bypass interactive mode, either:
+- Provide explicit flags on the command line (e.g., `--use-images --verbose`)
+- Use the `--no-interactive` flag for scripting/automation
 
 **Command-line Options:**
 - `-i, --input`: Path to transformations CSV (default: `output/transformations.csv`)
@@ -214,6 +228,8 @@ uv run python src/visualize_graph_3d.py --help
 - `-v, --verbose`: Enable verbose logging
 - `--use-images`: Use item images instead of colored spheres for nodes
 - `--images-dir`: Directory containing item images (default: `images/`)
+- `--filter-type`: Filter by transformation types (comma-separated, e.g., `crafting,smelting`)
+- `--no-interactive`: Disable interactive fzf prompts and use defaults/CLI args only
 
 **3D Visualization Features:**
 - **Interactive Controls**: Rotate with mouse drag, zoom with scroll wheel, pan with right-click drag
@@ -235,7 +251,8 @@ uv run python src/visualize_graph_3d.py --help
 | Readability | Can be cluttered with large graphs | Better use of 3D space |
 | Output | SVG, PNG, PDF files | Interactive window + optional save |
 | Performance | Fast for large graphs | Slower layout computation |
-| Filtering | By transformation type | All transformations |
+| Filtering | By transformation type (`-t` flag) | By transformation type (`--filter-type` flag) |
+| Option Selection | Command-line only | Interactive fzf menu or command-line |
 | Best for | Detailed static analysis, print | Exploration and understanding |
 
 **Customizing Colors:**
@@ -256,7 +273,9 @@ Colors can be hex codes (e.g., `#4A90E2`) or standard color names (e.g., `blue`)
 
 With 1961+ transformations, the full graph is very large and complex:
 - **2D Graphviz**: Use the `-t` flag to filter by transformation type for better readability
-- **3D Visualization**: Layout computation may take 5-30 seconds; interactive rotation remains smooth
+- **3D Visualization**: Use the `--filter-type` flag to focus on specific transformation types
+- Layout computation may take 5-30 seconds for full graph; filtering significantly improves performance
+- Interactive rotation remains smooth even with large graphs
 - View SVG files in a browser for pan/zoom capabilities
 - 3D visualization provides better spatial separation for large, interconnected graphs
 
