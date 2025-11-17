@@ -1,10 +1,10 @@
 """Module for downloading Minecraft Wiki pages."""
 
 import os
+import subprocess
 import time
 from pathlib import Path
 from typing import Dict
-import requests
 
 
 WIKI_PAGES: Dict[str, str] = {
@@ -19,80 +19,99 @@ WIKI_PAGES: Dict[str, str] = {
     "grindstone": "https://minecraft.wiki/w/Grindstone",
 }
 
-# Common mob list for drops extraction
+# Complete mob list for drops extraction (from https://minecraft.wiki/w/Mob)
 MOB_PAGES: Dict[str, str] = {
-    # Passive mobs
-    "chicken": "https://minecraft.wiki/w/Chicken",
-    "cow": "https://minecraft.wiki/w/Cow",
-    "pig": "https://minecraft.wiki/w/Pig",
-    "sheep": "https://minecraft.wiki/w/Sheep",
-    "rabbit": "https://minecraft.wiki/w/Rabbit",
-    "horse": "https://minecraft.wiki/w/Horse",
-    "donkey": "https://minecraft.wiki/w/Donkey",
-    "mule": "https://minecraft.wiki/w/Mule",
-    "llama": "https://minecraft.wiki/w/Llama",
-    "fox": "https://minecraft.wiki/w/Fox",
-    "cat": "https://minecraft.wiki/w/Cat",
-    "parrot": "https://minecraft.wiki/w/Parrot",
-    "bat": "https://minecraft.wiki/w/Bat",
-    "cod": "https://minecraft.wiki/w/Cod",
-    "salmon": "https://minecraft.wiki/w/Salmon",
-    "tropical_fish": "https://minecraft.wiki/w/Tropical_Fish",
-    "pufferfish": "https://minecraft.wiki/w/Pufferfish",
-    "squid": "https://minecraft.wiki/w/Squid",
-    "glow_squid": "https://minecraft.wiki/w/Glow_Squid",
-    "turtle": "https://minecraft.wiki/w/Turtle",
-    "frog": "https://minecraft.wiki/w/Frog",
-    "tadpole": "https://minecraft.wiki/w/Tadpole",
-    "axolotl": "https://minecraft.wiki/w/Axolotl",
-    "goat": "https://minecraft.wiki/w/Goat",
-    "sniffer": "https://minecraft.wiki/w/Sniffer",
+    # Passive mobs (allay to zombie horse)
+    "allay": "https://minecraft.wiki/w/Allay",
     "armadillo": "https://minecraft.wiki/w/Armadillo",
-    # Neutral mobs
-    "wolf": "https://minecraft.wiki/w/Wolf",
-    "spider": "https://minecraft.wiki/w/Spider",
-    "cave_spider": "https://minecraft.wiki/w/Cave_Spider",
-    "enderman": "https://minecraft.wiki/w/Enderman",
+    "axolotl": "https://minecraft.wiki/w/Axolotl",
+    "bat": "https://minecraft.wiki/w/Bat",
+    "camel": "https://minecraft.wiki/w/Camel",
+    "cat": "https://minecraft.wiki/w/Cat",
+    "chicken": "https://minecraft.wiki/w/Chicken",
+    "cod": "https://minecraft.wiki/w/Cod",
+    "copper_golem": "https://minecraft.wiki/w/Copper_Golem",
+    "cow": "https://minecraft.wiki/w/Cow",
+    "donkey": "https://minecraft.wiki/w/Donkey",
+    "frog": "https://minecraft.wiki/w/Frog",
+    "glow_squid": "https://minecraft.wiki/w/Glow_Squid",
+    "happy_ghast": "https://minecraft.wiki/w/Happy_Ghast",
+    "horse": "https://minecraft.wiki/w/Horse",
+    "mooshroom": "https://minecraft.wiki/w/Mooshroom",
+    "mule": "https://minecraft.wiki/w/Mule",
+    "ocelot": "https://minecraft.wiki/w/Ocelot",
+    "parrot": "https://minecraft.wiki/w/Parrot",
+    "pig": "https://minecraft.wiki/w/Pig",
+    "rabbit": "https://minecraft.wiki/w/Rabbit",
+    "salmon": "https://minecraft.wiki/w/Salmon",
+    "sheep": "https://minecraft.wiki/w/Sheep",
+    "sniffer": "https://minecraft.wiki/w/Sniffer",
+    "snow_golem": "https://minecraft.wiki/w/Snow_Golem",
+    "squid": "https://minecraft.wiki/w/Squid",
+    "strider": "https://minecraft.wiki/w/Strider",
+    "tadpole": "https://minecraft.wiki/w/Tadpole",
+    "tropical_fish": "https://minecraft.wiki/w/Tropical_Fish",
+    "turtle": "https://minecraft.wiki/w/Turtle",
+    "villager": "https://minecraft.wiki/w/Villager",
+    "wandering_trader": "https://minecraft.wiki/w/Wandering_Trader",
+    "camel_husk": "https://minecraft.wiki/w/Camel_Husk",
+    "skeleton_horse": "https://minecraft.wiki/w/Skeleton_Horse",
+    "zombie_horse": "https://minecraft.wiki/w/Zombie_Horse",
+    # Neutral mobs (bee to zombified piglin)
     "bee": "https://minecraft.wiki/w/Bee",
-    "iron_golem": "https://minecraft.wiki/w/Iron_Golem",
-    "polar_bear": "https://minecraft.wiki/w/Polar_Bear",
-    "panda": "https://minecraft.wiki/w/Panda",
     "dolphin": "https://minecraft.wiki/w/Dolphin",
-    "zombified_piglin": "https://minecraft.wiki/w/Zombified_Piglin",
-    "piglin": "https://minecraft.wiki/w/Piglin",
-    "piglin_brute": "https://minecraft.wiki/w/Piglin_Brute",
-    # Hostile mobs
-    "zombie": "https://minecraft.wiki/w/Zombie",
-    "skeleton": "https://minecraft.wiki/w/Skeleton",
-    "creeper": "https://minecraft.wiki/w/Creeper",
-    "witch": "https://minecraft.wiki/w/Witch",
-    "slime": "https://minecraft.wiki/w/Slime",
-    "magma_cube": "https://minecraft.wiki/w/Magma_Cube",
-    "ghast": "https://minecraft.wiki/w/Ghast",
-    "blaze": "https://minecraft.wiki/w/Blaze",
-    "phantom": "https://minecraft.wiki/w/Phantom",
+    "fox": "https://minecraft.wiki/w/Fox",
+    "goat": "https://minecraft.wiki/w/Goat",
+    "iron_golem": "https://minecraft.wiki/w/Iron_Golem",
+    "llama": "https://minecraft.wiki/w/Llama",
+    "nautilus": "https://minecraft.wiki/w/Nautilus",
+    "panda": "https://minecraft.wiki/w/Panda",
+    "polar_bear": "https://minecraft.wiki/w/Polar_Bear",
+    "pufferfish": "https://minecraft.wiki/w/Pufferfish",
+    "trader_llama": "https://minecraft.wiki/w/Trader_Llama",
+    "wolf": "https://minecraft.wiki/w/Wolf",
+    "cave_spider": "https://minecraft.wiki/w/Cave_Spider",
     "drowned": "https://minecraft.wiki/w/Drowned",
-    "husk": "https://minecraft.wiki/w/Husk",
-    "stray": "https://minecraft.wiki/w/Stray",
-    "shulker": "https://minecraft.wiki/w/Shulker",
-    "guardian": "https://minecraft.wiki/w/Guardian",
-    "elder_guardian": "https://minecraft.wiki/w/Elder_Guardian",
-    "endermite": "https://minecraft.wiki/w/Endermite",
-    "silverfish": "https://minecraft.wiki/w/Silverfish",
-    "vindicator": "https://minecraft.wiki/w/Vindicator",
-    "evoker": "https://minecraft.wiki/w/Evoker",
-    "vex": "https://minecraft.wiki/w/Vex",
-    "pillager": "https://minecraft.wiki/w/Pillager",
-    "ravager": "https://minecraft.wiki/w/Ravager",
-    "hoglin": "https://minecraft.wiki/w/Hoglin",
-    "zoglin": "https://minecraft.wiki/w/Zoglin",
-    "wither_skeleton": "https://minecraft.wiki/w/Wither_Skeleton",
+    "enderman": "https://minecraft.wiki/w/Enderman",
+    "piglin": "https://minecraft.wiki/w/Piglin",
+    "spider": "https://minecraft.wiki/w/Spider",
+    "zombie_nautilus": "https://minecraft.wiki/w/Zombie_Nautilus",
+    "zombified_piglin": "https://minecraft.wiki/w/Zombified_Piglin",
+    # Hostile mobs (blaze to wither)
+    "blaze": "https://minecraft.wiki/w/Blaze",
     "bogged": "https://minecraft.wiki/w/Bogged",
     "breeze": "https://minecraft.wiki/w/Breeze",
-    # Boss mobs
+    "creaking": "https://minecraft.wiki/w/Creaking",
+    "creeper": "https://minecraft.wiki/w/Creeper",
+    "elder_guardian": "https://minecraft.wiki/w/Elder_Guardian",
+    "endermite": "https://minecraft.wiki/w/Endermite",
+    "evoker": "https://minecraft.wiki/w/Evoker",
+    "ghast": "https://minecraft.wiki/w/Ghast",
+    "guardian": "https://minecraft.wiki/w/Guardian",
+    "hoglin": "https://minecraft.wiki/w/Hoglin",
+    "husk": "https://minecraft.wiki/w/Husk",
+    "magma_cube": "https://minecraft.wiki/w/Magma_Cube",
+    "parched": "https://minecraft.wiki/w/Parched",
+    "phantom": "https://minecraft.wiki/w/Phantom",
+    "piglin_brute": "https://minecraft.wiki/w/Piglin_Brute",
+    "pillager": "https://minecraft.wiki/w/Pillager",
+    "ravager": "https://minecraft.wiki/w/Ravager",
+    "shulker": "https://minecraft.wiki/w/Shulker",
+    "silverfish": "https://minecraft.wiki/w/Silverfish",
+    "skeleton": "https://minecraft.wiki/w/Skeleton",
+    "slime": "https://minecraft.wiki/w/Slime",
+    "stray": "https://minecraft.wiki/w/Stray",
+    "vex": "https://minecraft.wiki/w/Vex",
+    "vindicator": "https://minecraft.wiki/w/Vindicator",
+    "warden": "https://minecraft.wiki/w/Warden",
+    "witch": "https://minecraft.wiki/w/Witch",
+    "wither_skeleton": "https://minecraft.wiki/w/Wither_Skeleton",
+    "zoglin": "https://minecraft.wiki/w/Zoglin",
+    "zombie": "https://minecraft.wiki/w/Zombie",
+    "zombie_villager": "https://minecraft.wiki/w/Zombie_Villager",
     "ender_dragon": "https://minecraft.wiki/w/Ender_Dragon",
     "wither": "https://minecraft.wiki/w/Wither",
-    "warden": "https://minecraft.wiki/w/Warden",
+    # Boss mob (warden already listed in hostile section above)
 }
 
 
@@ -120,18 +139,31 @@ def download_page(page_name: str, url: str, output_dir: str) -> str:
 
     # Download the page
     print(f"Downloading {page_name} from {url}...")
-    headers = {
-        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0"
-    }
 
-    # Add delay to respect rate limits (2 seconds between requests)
-    time.sleep(2)
+    # Add delay to respect rate limits (5 seconds between requests)
+    time.sleep(5)
 
-    response = requests.get(url, headers=headers, timeout=30)
-    response.raise_for_status()
+    # Use curl to download (bypasses some wiki blocking)
+    curl_command = [
+        "curl",
+        "-s",  # silent
+        "-L",  # follow redirects
+        "-A",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "-H",
+        "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "-H",
+        "Accept-Language: en-US,en;q=0.5",
+        url,
+        "-o",
+        str(output_path),
+    ]
 
-    # Save to file
-    output_path.write_text(response.text, encoding="utf-8")
+    result = subprocess.run(curl_command, capture_output=True, text=True, timeout=60)
+
+    if result.returncode != 0:
+        raise Exception(f"curl failed with return code {result.returncode}: {result.stderr}")
+
     print(f"Saved to: {output_path}")
 
     return str(output_path)
@@ -144,16 +176,31 @@ def download_all_pages(output_dir: str = "ai_doc/downloaded_pages") -> None:
     Args:
         output_dir: Base directory for downloaded pages
     """
+    failed_downloads = []
+
     print("Downloading main wiki pages...")
     for page_name, url in WIKI_PAGES.items():
-        download_page(page_name, url, output_dir)
+        try:
+            download_page(page_name, url, output_dir)
+        except Exception as e:
+            print(f"Failed to download {page_name}: {e}")
+            failed_downloads.append((page_name, url, str(e)))
 
     print("\nDownloading mob pages...")
     mob_dir = os.path.join(output_dir, "mobs")
     for mob_name, url in MOB_PAGES.items():
-        download_page(mob_name, url, mob_dir)
+        try:
+            download_page(mob_name, url, mob_dir)
+        except Exception as e:
+            print(f"Failed to download {mob_name}: {e}")
+            failed_downloads.append((mob_name, url, str(e)))
 
     print("\nAll downloads complete!")
+
+    if failed_downloads:
+        print(f"\n{len(failed_downloads)} downloads failed:")
+        for name, url, error in failed_downloads:
+            print(f"  - {name}: {error}")
 
 
 if __name__ == "__main__":
