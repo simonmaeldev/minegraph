@@ -207,6 +207,7 @@ Cake,https://minecraft.wiki/w/Cake
 Calibrated Sculk Sensor,https://minecraft.wiki/w/Calibrated_Sculk_Sensor
 Campfire,https://minecraft.wiki/w/Campfire
 Candle,https://minecraft.wiki/w/Candle
+Carpet,https://minecraft.wiki/w/Carpet
 Carrot,https://minecraft.wiki/w/Carrot
 Carrot on a Stick,https://minecraft.wiki/w/Carrot_on_a_Stick
 Cartography Table,https://minecraft.wiki/w/Cartography_Table
@@ -421,12 +422,22 @@ Egg,https://minecraft.wiki/w/Egg
 Emerald,https://minecraft.wiki/w/Emerald
 Emerald Ore,https://minecraft.wiki/w/Emerald_Ore
 Empty Map,https://minecraft.wiki/w/Empty_Map
+Enchanted Book,https://minecraft.wiki/w/Enchanted_Book
 Enchanted Bow,https://minecraft.wiki/w/Enchanted_Bow
 Enchanted Crossbow,https://minecraft.wiki/w/Enchanted_Crossbow
 Enchanted Diamond Axe,https://minecraft.wiki/w/Enchanted_Diamond_Axe
+Enchanted Diamond Boots,https://minecraft.wiki/w/Enchanted_Diamond_Boots
+Enchanted Diamond Chestplate,https://minecraft.wiki/w/Enchanted_Diamond_Chestplate
+Enchanted Diamond Helmet,https://minecraft.wiki/w/Enchanted_Diamond_Helmet
+Enchanted Diamond Leggings,https://minecraft.wiki/w/Enchanted_Diamond_Leggings
+Enchanted Diamond Pickaxe,https://minecraft.wiki/w/Enchanted_Diamond_Pickaxe
+Enchanted Diamond Shovel,https://minecraft.wiki/w/Enchanted_Diamond_Shovel
+Enchanted Diamond Sword,https://minecraft.wiki/w/Enchanted_Diamond_Sword
 Enchanted Fishing Rod,https://minecraft.wiki/w/Enchanted_Fishing_Rod
 Enchanted Golden Apple,https://minecraft.wiki/w/Enchanted_Golden_Apple
 Enchanted Iron Axe,https://minecraft.wiki/w/Enchanted_Iron_Axe
+Enchanted Iron Pickaxe,https://minecraft.wiki/w/Enchanted_Iron_Pickaxe
+Enchanted Iron Shovel,https://minecraft.wiki/w/Enchanted_Iron_Shovel
 Enchanted Iron Sword,https://minecraft.wiki/w/Enchanted_Iron_Sword
 Enchanting Table,https://minecraft.wiki/w/Enchanting_Table
 End Crystal,https://minecraft.wiki/w/End_Crystal
@@ -477,7 +488,9 @@ Ghast Tear,https://minecraft.wiki/w/Ghast_Tear
 Glass,https://minecraft.wiki/w/Glass
 Glass Bottle,https://minecraft.wiki/w/Glass_Bottle
 Glass Pane,https://minecraft.wiki/w/Glass_Pane
+Glazed Terracotta,https://minecraft.wiki/w/Glazed_Terracotta
 Glistering Melon Slice,https://minecraft.wiki/w/Glistering_Melon_Slice
+Globe Banner Pattern,https://minecraft.wiki/w/Globe_Banner_Pattern
 Glow Ink Sac,https://minecraft.wiki/w/Glow_Ink_Sac
 Glow Item Frame,https://minecraft.wiki/w/Glow_Item_Frame
 Glowstone,https://minecraft.wiki/w/Glowstone
@@ -591,6 +604,7 @@ Ladder,https://minecraft.wiki/w/Ladder
 Lantern,https://minecraft.wiki/w/Lantern
 Lapis Lazuli,https://minecraft.wiki/w/Lapis_Lazuli
 Lapis Lazuli Ore,https://minecraft.wiki/w/Lapis_Lazuli_Ore
+Lava Bucket,https://minecraft.wiki/w/Lava_Bucket
 Leaf Litter,https://minecraft.wiki/w/Leaf_Litter
 Leather,https://minecraft.wiki/w/Leather
 Leather Boots,https://minecraft.wiki/w/Leather_Boots
@@ -739,6 +753,7 @@ Mundane Lingering Potion,https://minecraft.wiki/w/Mundane_Lingering_Potion
 Mushroom Stew,https://minecraft.wiki/w/Mushroom_Stew
 Music Disc,https://minecraft.wiki/w/Music_Disc_5
 Music Disc Lava Chicken,https://minecraft.wiki/w/Music_Disc_Lava_Chicken
+Name Tag,https://minecraft.wiki/w/Name_Tag
 Nautilus Shell,https://minecraft.wiki/w/Nautilus_Shell
 Nether Brick,https://minecraft.wiki/w/Nether_Brick
 Nether Brick Fence,https://minecraft.wiki/w/Nether_Brick_Fence
@@ -786,6 +801,7 @@ Oak Trapdoor,https://minecraft.wiki/w/Oak_Trapdoor
 Oak Wood,https://minecraft.wiki/w/Oak_Wood
 Observer,https://minecraft.wiki/w/Observer
 Obsidian,https://minecraft.wiki/w/Obsidian
+Ocean Explorer Map,https://minecraft.wiki/w/Ocean_Explorer_Map
 Ominous Banner,https://minecraft.wiki/w/Ominous_Banner
 Ominous Shield,https://minecraft.wiki/w/Ominous_Shield
 Open Eyeblossom,https://minecraft.wiki/w/Open_Eyeblossom
@@ -910,6 +926,7 @@ Prismarine Stairs,https://minecraft.wiki/w/Prismarine_Stairs
 Prismarine Wall,https://minecraft.wiki/w/Prismarine_Wall
 Prize Pottery Sherd,https://minecraft.wiki/w/Prize_Pottery_Sherd
 Pufferfish,https://minecraft.wiki/w/Pufferfish
+Pufferfish (item),https://minecraft.wiki/w/Pufferfish_(item)
 Pumpkin,https://minecraft.wiki/w/Pumpkin
 Pumpkin Pie,https://minecraft.wiki/w/Pumpkin_Pie
 Pumpkin Seeds,https://minecraft.wiki/w/Pumpkin_Seeds
@@ -1075,7 +1092,10 @@ Stone Brick Stairs,https://minecraft.wiki/w/Stone_Brick_Stairs
 Stone Brick Wall,https://minecraft.wiki/w/Stone_Brick_Wall
 Stone Bricks,https://minecraft.wiki/w/Stone_Bricks
 Stone Button,https://minecraft.wiki/w/Stone_Button
+Stone Hoe,https://minecraft.wiki/w/Stone_Hoe
+Stone Pickaxe,https://minecraft.wiki/w/Stone_Pickaxe
 Stone Pressure Plate,https://minecraft.wiki/w/Stone_Pressure_Plate
+Stone Shovel,https://minecraft.wiki/w/Stone_Shovel
 Stone Slab,https://minecraft.wiki/w/Stone_Slab
 Stone Spear,https://minecraft.wiki/w/Stone_Spear
 Stone Stairs,https://minecraft.wiki/w/Stone_Stairs
@@ -1107,6 +1127,7 @@ Sugar,https://minecraft.wiki/w/Sugar
 Sugar Cane,https://minecraft.wiki/w/Sugar_Cane
 Sunflower,https://minecraft.wiki/w/Sunflower
 Suspicious Stew,https://minecraft.wiki/w/Suspicious_Stew
+Sweet Berries,https://minecraft.wiki/w/Sweet_Berries
 TNT,https://minecraft.wiki/w/TNT
 Target,https://minecraft.wiki/w/Target
 Terracotta,https://minecraft.wiki/w/Terracotta
@@ -1120,6 +1141,7 @@ Torchflower,https://minecraft.wiki/w/Torchflower
 Trapped Chest,https://minecraft.wiki/w/Trapped_Chest
 Trial Explorer Map,https://minecraft.wiki/w/Trial_Explorer_Map
 Tripwire Hook,https://minecraft.wiki/w/Tripwire_Hook
+Tropical Fish (item),https://minecraft.wiki/w/Tropical_Fish_(item)
 Tuff,https://minecraft.wiki/w/Tuff
 Tuff Brick Slab,https://minecraft.wiki/w/Tuff_Brick_Slab
 Tuff Brick Stairs,https://minecraft.wiki/w/Tuff_Brick_Stairs

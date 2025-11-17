@@ -680,6 +680,14 @@ def parse_trading(html_content: str) -> List[Transformation]:
     """
     Parse trading recipes from HTML content.
 
+    Simplified approach that parses ALL trades from ALL villager profession tables
+    by dynamically detecting item columns per row instead of using fixed indices.
+
+    Key simplifications:
+    - No Java Edition filtering (both editions offer same trades, only probabilities differ)
+    - No level extraction (level metadata not needed for transformation graph)
+    - Dynamic column detection per row (avoids rowspan-induced index misalignment)
+
     Args:
         html_content: HTML content from trading wiki page
 
@@ -693,12 +701,11 @@ def parse_trading(html_content: str) -> List[Transformation]:
     tables = soup.find_all("table", class_="wikitable")
 
     for table in tables:
-        # Try to find villager type from the table header with data-description attribute
+        # Extract villager type from table header with data-description attribute
         villager_header = table.find("th", attrs={"data-description": True})
         villager_type = villager_header.get("data-description", "Unknown") if villager_header else "Unknown"
 
         # Find the header row that contains "Item wanted" and "Item given"
-        # These are in a row with rowspan="2", not the first row
         header_row = None
         for tr in table.find_all("tr"):
             headers = [th.get_text(strip=True) for th in tr.find_all("th")]
@@ -709,80 +716,45 @@ def parse_trading(html_content: str) -> List[Transformation]:
         if not header_row:
             continue
 
-        headers = [th.get_text(strip=True) for th in header_row.find_all("th")]
-
-        # Find "Item wanted" and "Item given" column indices
-        try:
-            wanted_idx = headers.index("Item wanted")
-            given_idx = headers.index("Item given")
-        except ValueError:
-            # Try alternative column names
-            try:
-                wanted_idx = next(
-                    i for i, h in enumerate(headers) if "wanted" in h.lower()
-                )
-                given_idx = next(
-                    i for i, h in enumerate(headers) if "given" in h.lower()
-                )
-            except StopIteration:
-                continue
-
-        # Find Java Edition column index if present (for tables with both Bedrock and Java columns)
-        # Also check if table has ONLY Bedrock Edition column (should skip entire table)
-        # Look for header cells with "Java Edition" or "Bedrock Edition" links
-        java_col_idx = None
-        bedrock_col_idx = None
-        for i, th in enumerate(header_row.find_all(["th", "td"])):
-            th_text = th.get_text()
-            if "Java Edition" in th_text:
-                java_col_idx = i
-            if "Bedrock Edition" in th_text:
-                bedrock_col_idx = i
-
-        # Skip tables that only have Bedrock Edition column (no Java Edition column)
-        if bedrock_col_idx is not None and java_col_idx is None:
-            continue
-
-        # Parse data rows - only rows that come after the header row with "Item wanted"
+        # Parse data rows - all rows after the header row
         all_rows = table.find_all("tr")
         header_idx = all_rows.index(header_row)
         data_rows = all_rows[header_idx + 1:]
 
         for row in data_rows:
-            # Check if this row is for Java Edition
-            # If table has separate columns for editions, check the Java Edition column
-            if java_col_idx is not None:
-                # Row must have data in the Java Edition column
-                cells_for_edition_check = row.find_all(["th", "td"])
-                if len(cells_for_edition_check) <= java_col_idx:
-                    continue
-                # The Java Edition column should have probability/data, not be empty
-                java_cell = cells_for_edition_check[java_col_idx]
-                if not java_cell.get_text(strip=True):
-                    continue
-            else:
-                # No edition columns at all, use standard is_java_edition check
-                if not is_java_edition(row):
-                    continue
-            # Find all cells - both th and td (level column is often th)
+            # Find all cells in this row
             cells = row.find_all(["th", "td"])
-            if len(cells) <= max(wanted_idx, given_idx):
+
+            # Skip rows with too few cells (likely separator or header rows)
+            if len(cells) < 2:
                 continue
 
-            # Extract input items (wanted)
-            wanted_cell = cells[wanted_idx]
-            input_items: List[Item] = []
+            # Dynamic column detection: find cells with item links
+            # Typically there are 2 cells with item links: wanted (input) and given (output)
+            cells_with_items = []
+            for i, cell in enumerate(cells):
+                # Check if cell contains item links
+                item_links = cell.find_all("a", href=re.compile(r"^/w/"))
+                if item_links:
+                    cells_with_items.append((i, cell, item_links))
 
-            # Get full cell text to extract quantities
+            # We need at least 2 cells with items (wanted and given)
+            if len(cells_with_items) < 2:
+                continue
+
+            # Assume first cell with items is "wanted" (input) and second is "given" (output)
+            wanted_cell = cells_with_items[0][1]
+            wanted_links = cells_with_items[0][2]
+            given_cell = cells_with_items[1][1]
+            given_links = cells_with_items[1][2]
+
+            # Extract input items (wanted)
+            input_items: List[Item] = []
             cell_text = wanted_cell.get_text(strip=True)
 
-            # Parse items from cell - handle multiple items and quantities
-            # Pattern: "15 × Coal" or "Emerald" or "Emerald + Book"
-            links = wanted_cell.find_all("a", href=re.compile(r"^/w/"))
-
-            if len(links) == 1:
+            if len(wanted_links) == 1:
                 # Single item - check for quantity prefix
-                item = extract_item_from_link(links[0])
+                item = extract_item_from_link(wanted_links[0])
                 if item:
                     quantity = parse_quantity(cell_text)
                     # Add item multiple times to represent quantity
@@ -790,11 +762,10 @@ def parse_trading(html_content: str) -> List[Transformation]:
                         input_items.append(item)
             else:
                 # Multiple items in cell (e.g., "Emerald + Book")
-                for link in links:
+                for link in wanted_links:
                     item = extract_item_from_link(link)
                     if item:
-                        # Try to find quantity for this specific item by looking at text before it
-                        # Get the item's link HTML position to find preceding text
+                        # Try to find quantity for this specific item
                         link_str = str(link)
                         link_pos = str(wanted_cell).find(link_str)
                         if link_pos > 0:
@@ -813,39 +784,26 @@ def parse_trading(html_content: str) -> List[Transformation]:
                             input_items.append(item)
 
             # Extract output items (given)
-            given_cell = cells[given_idx]
             output_items: List[Item] = []
-
-            # Get full cell text for output quantities
             output_text = given_cell.get_text(strip=True)
 
-            links = given_cell.find_all("a", href=re.compile(r"^/w/"))
-            if links:
-                # Parse output - similar logic for quantity
-                if len(links) == 1:
-                    item = extract_item_from_link(links[0])
+            if len(given_links) == 1:
+                # Single output item
+                item = extract_item_from_link(given_links[0])
+                if item:
+                    quantity = parse_quantity(output_text)
+                    # Add item multiple times to represent quantity
+                    for _ in range(quantity):
+                        output_items.append(item)
+            else:
+                # Multiple output items
+                for link in given_links:
+                    item = extract_item_from_link(link)
                     if item:
-                        quantity = parse_quantity(output_text)
-                        # Add item multiple times to represent quantity
-                        for _ in range(quantity):
-                            output_items.append(item)
-                else:
-                    # Multiple output items
-                    for link in links:
-                        item = extract_item_from_link(link)
-                        if item:
-                            output_items.append(item)
+                        output_items.append(item)
 
+            # Create transformation if we have both inputs and outputs
             if input_items and output_items:
-                # Try to get level from row - look for level column
-                level = "Unknown"
-                # The first cell often contains the level (e.g., "Novice", "Apprentice")
-                if len(cells) > 0:
-                    first_cell_text = cells[0].get_text(strip=True)
-                    # Check if it's a valid level name
-                    if first_cell_text in ["Novice", "Apprentice", "Journeyman", "Expert", "Master"]:
-                        level = first_cell_text
-
                 transformations.append(
                     Transformation(
                         transformation_type=TransformationType.TRADING,
@@ -853,7 +811,6 @@ def parse_trading(html_content: str) -> List[Transformation]:
                         outputs=[output_items[0]],  # Always use single output
                         metadata={
                             "villager_type": villager_type,
-                            "level": level,
                         },
                     )
                 )

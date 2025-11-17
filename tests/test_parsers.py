@@ -308,7 +308,6 @@ class TestParsers:
         assert len(result[0].outputs) == 1
         assert result[0].outputs[0].name == "Emerald"
         assert result[0].metadata["villager_type"] == "Armorer"
-        assert result[0].metadata["level"] == "Novice"
 
     def test_parse_trading_emerald_to_item(self):
         """Test parsing an emerald-to-item trade (buying from villager)."""
@@ -364,7 +363,6 @@ class TestParsers:
         assert len(result[0].outputs) == 1
         assert result[0].outputs[0].name == "Iron Helmet"
         assert result[0].metadata["villager_type"] == "Armorer"
-        assert result[0].metadata["level"] == "Apprentice"
 
     def test_parse_trading_no_quantity_multiplier(self):
         """Test parsing a trade without quantity multiplier."""
@@ -416,10 +414,9 @@ class TestParsers:
         assert result[0].inputs[0].name == "Diamond"
         assert len(result[0].outputs) == 1
         assert result[0].outputs[0].name == "Emerald"
-        assert result[0].metadata["level"] == "Journeyman"
 
-    def test_parse_trading_filters_bedrock_edition(self):
-        """Test that parse_trading filters out Bedrock Edition trades."""
+    def test_parse_trading_parses_all_editions(self):
+        """Test that parse_trading now parses trades from all editions (both Bedrock and Java)."""
         from src.core.parsers import parse_trading
 
         html = '''
@@ -463,8 +460,114 @@ class TestParsers:
 
         result = parse_trading(html)
 
-        # Should be empty because it's Bedrock Edition
-        assert len(result) == 0
+        # Should parse Bedrock Edition trades now (since both editions offer same trades)
+        assert len(result) == 1
+        assert result[0].inputs[0].name == "Wheat"
+        assert result[0].outputs[0].name == "Emerald"
+        assert result[0].metadata["villager_type"] == "Farmer"
+
+    def test_parse_trading_multi_slot_trades(self):
+        """Test parsing multiple trades in the same slot (rowspan structure)."""
+        from src.core.parsers import parse_trading
+        from src.core.data_models import TransformationType
+
+        html = '''
+        <table class="wikitable" style="text-align:center">
+            <tbody>
+                <tr>
+                    <th colspan="9" data-description="Armorer">
+                        <span class="nowrap">
+                            <a href="/w/Armorer" title="Armorer">
+                                <span class="sprite-text">Armorer</span>
+                            </a>
+                        </span>
+                    </th>
+                </tr>
+                <tr>
+                    <th rowspan="2">Level</th>
+                    <th rowspan="2">Slot</th>
+                    <th><i><a href="/w/Java_Edition" title="Java Edition">Java Edition</a></i></th>
+                    <th rowspan="2">Item wanted</th>
+                    <th rowspan="2">Item given</th>
+                </tr>
+                <tr>
+                    <th>Probability</th>
+                </tr>
+                <tr>
+                    <th rowspan="5">Apprentice</th>
+                    <th rowspan="4">2</th>
+                    <td>25%</td>
+                    <td>5 × <span class="nowrap">
+                        <a href="/w/Emerald" title="Emerald">
+                            <span class="sprite-text">Emerald</span>
+                        </a>
+                    </span></td>
+                    <td><span class="nowrap">
+                        <a href="/w/Iron_Helmet" title="Iron Helmet">
+                            <span class="sprite-text">Iron Helmet</span>
+                        </a>
+                    </span></td>
+                </tr>
+                <tr>
+                    <td>25%</td>
+                    <td>9 × <span class="nowrap">
+                        <a href="/w/Emerald" title="Emerald">
+                            <span class="sprite-text">Emerald</span>
+                        </a>
+                    </span></td>
+                    <td><span class="nowrap">
+                        <a href="/w/Iron_Chestplate" title="Iron Chestplate">
+                            <span class="sprite-text">Iron Chestplate</span>
+                        </a>
+                    </span></td>
+                </tr>
+                <tr>
+                    <td>25%</td>
+                    <td>7 × <span class="nowrap">
+                        <a href="/w/Emerald" title="Emerald">
+                            <span class="sprite-text">Emerald</span>
+                        </a>
+                    </span></td>
+                    <td><span class="nowrap">
+                        <a href="/w/Iron_Leggings" title="Iron Leggings">
+                            <span class="sprite-text">Iron Leggings</span>
+                        </a>
+                    </span></td>
+                </tr>
+                <tr>
+                    <td>25%</td>
+                    <td>4 × <span class="nowrap">
+                        <a href="/w/Emerald" title="Emerald">
+                            <span class="sprite-text">Emerald</span>
+                        </a>
+                    </span></td>
+                    <td><span class="nowrap">
+                        <a href="/w/Iron_Boots" title="Iron Boots">
+                            <span class="sprite-text">Iron Boots</span>
+                        </a>
+                    </span></td>
+                </tr>
+            </tbody>
+        </table>
+        '''
+
+        result = parse_trading(html)
+
+        # Should parse all 4 armor pieces (multi-slot trades)
+        assert len(result) == 4
+
+        # Verify each armor piece is present
+        armor_pieces = {t.outputs[0].name for t in result}
+        assert "Iron Helmet" in armor_pieces
+        assert "Iron Chestplate" in armor_pieces
+        assert "Iron Leggings" in armor_pieces
+        assert "Iron Boots" in armor_pieces
+
+        # All should have Emerald as input and Armorer as villager type
+        for trade in result:
+            assert trade.transformation_type == TransformationType.TRADING
+            assert trade.inputs[0].name == "Emerald"
+            assert trade.metadata["villager_type"] == "Armorer"
 
     def test_parse_mob_drops_simple(self):
         """Test parsing mob drops."""
