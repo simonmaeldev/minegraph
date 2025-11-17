@@ -962,6 +962,12 @@ def parse_composting(html_content: str) -> List[Transformation]:
     """
     Parse composting recipes from HTML content.
 
+    The composting table has a structure where:
+    - First row contains success rate percentages (30%, 50%, 65%, 85%, 100%)
+    - Second row has <th colspan="6">Items</th> header
+    - Following rows have <td> cells with <ul> lists containing item links
+    - Each column corresponds to a success rate percentage
+
     Args:
         html_content: HTML content from composter wiki page
 
@@ -972,63 +978,82 @@ def parse_composting(html_content: str) -> List[Transformation]:
     transformations: List[Transformation] = []
     seen_signatures = set()
 
-    # Find composting tables
-    tables = soup.find_all("table", class_="wikitable")
-
     # Create bone meal item as output
     bone_meal = Item(name="Bone Meal", url="https://minecraft.wiki/w/Bone_Meal")
+
+    # Find composting tables by looking for the "Items" header row
+    tables = soup.find_all("table", class_="wikitable")
 
     for table in tables:
         if not is_java_edition(table):
             continue
 
-        # Look for tables with composting information
-        header = table.find("tr")
-        if not header:
+        # Look for the row with "Items" header
+        items_header_row = None
+        percentage_row = None
+
+        for row in table.find_all("tr"):
+            th_tags = row.find_all("th")
+            for th in th_tags:
+                # Check if this is the "Items" header with colspan
+                text = th.get_text(strip=True)
+                if text == "Items" and th.get("colspan"):
+                    items_header_row = row
+                    # The previous row should contain the percentages
+                    prev_row = row.find_previous_sibling("tr")
+                    if prev_row:
+                        percentage_row = prev_row
+                    break
+            if items_header_row:
+                break
+
+        if not items_header_row:
             continue
 
-        headers = [th.get_text(strip=True) for th in header.find_all("th")]
+        # Extract success rates from percentage row
+        success_rates = []
+        if percentage_row:
+            for cell in percentage_row.find_all("td"):
+                rate_text = cell.get_text(strip=True)
+                if "%" in rate_text:
+                    try:
+                        rate = float(rate_text.replace("%", "")) / 100.0
+                        success_rates.append(rate)
+                    except ValueError:
+                        success_rates.append(0.0)
 
-        # Check if this is a composting table (has "chance" or "%" column)
-        if not any("chance" in h.lower() or "%" in h for h in headers):
-            continue
-
-        # Parse rows
-        rows = table.find_all("tr")[1:]
-
-        for row in rows:
-            cells = row.find_all("td")
+        # Parse rows following the "Items" header
+        current_row = items_header_row.find_next_sibling("tr")
+        while current_row:
+            cells = current_row.find_all("td")
             if not cells:
-                continue
+                # No more data rows
+                break
 
-            # Find item links
-            links = cells[0].find_all("a", href=re.compile(r"^/w/"))
+            # Each cell corresponds to a success rate column
+            for col_idx, cell in enumerate(cells):
+                # Get success rate for this column
+                success_rate = success_rates[col_idx] if col_idx < len(success_rates) else 0.0
 
-            for link in links:
-                item = extract_item_from_link(link)
-                if item:
-                    # Extract success rate if present
-                    success_rate = 0.0
-                    if len(cells) > 1:
-                        rate_text = cells[1].get_text(strip=True)
-                        # Parse percentage or fraction
-                        if "%" in rate_text:
-                            try:
-                                success_rate = float(rate_text.replace("%", "")) / 100.0
-                            except ValueError:
-                                pass
+                # Find all item links in this cell (may be in <ul> lists)
+                links = cell.find_all("a", href=re.compile(r"^/w/"))
 
-                    transformation = Transformation(
-                        transformation_type=TransformationType.COMPOSTING,
-                        inputs=[item],
-                        outputs=[bone_meal],
-                        metadata={"success_rate": success_rate},
-                    )
-                    # Only add if not seen before
-                    sig = transformation.get_signature()
-                    if sig not in seen_signatures:
-                        seen_signatures.add(sig)
-                        transformations.append(transformation)
+                for link in links:
+                    item = extract_item_from_link(link)
+                    if item:
+                        transformation = Transformation(
+                            transformation_type=TransformationType.COMPOSTING,
+                            inputs=[item],
+                            outputs=[bone_meal],
+                            metadata={"success_rate": success_rate},
+                        )
+                        # Only add if not seen before
+                        sig = transformation.get_signature()
+                        if sig not in seen_signatures:
+                            seen_signatures.add(sig)
+                            transformations.append(transformation)
+
+            current_row = current_row.find_next_sibling("tr")
 
     return transformations
 

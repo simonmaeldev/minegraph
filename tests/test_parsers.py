@@ -1167,3 +1167,200 @@ class TestEducationEditionFiltering:
         element = soup.find("span", class_="mcui")
 
         assert is_java_edition(element) is True
+
+
+class TestParseComposting:
+    """Tests for parse_composting function."""
+
+    def test_parse_composting_empty_html(self):
+        """Test that empty HTML returns empty list."""
+        from src.core.parsers import parse_composting
+
+        empty_html = "<html><body></body></html>"
+        result = parse_composting(empty_html)
+
+        assert isinstance(result, list)
+        assert len(result) == 0
+
+    def test_parse_composting_with_items(self):
+        """Test parsing composting table with multiple items."""
+        from src.core.parsers import parse_composting
+
+        html = '''
+        <html><body>
+        <table class="wikitable">
+            <tr>
+                <td style="text-align:center">30%</td>
+                <td style="text-align:center">50%</td>
+                <td style="text-align:center">65%</td>
+            </tr>
+            <tr>
+                <th colspan="6">Items</th>
+            </tr>
+            <tr>
+                <td style="vertical-align:top">
+                    <ul>
+                        <li><a href="/w/Beetroot_Seeds" title="Beetroot Seeds">Beetroot Seeds</a></li>
+                        <li><a href="/w/Kelp" title="Kelp">Kelp</a></li>
+                    </ul>
+                </td>
+                <td style="vertical-align:top">
+                    <ul>
+                        <li><a href="/w/Cactus" title="Cactus">Cactus</a></li>
+                        <li><a href="/w/Sugar_Cane" title="Sugar Cane">Sugar Cane</a></li>
+                    </ul>
+                </td>
+                <td style="vertical-align:top">
+                    <ul>
+                        <li><a href="/w/Apple" title="Apple">Apple</a></li>
+                        <li><a href="/w/Carrot" title="Carrot">Carrot</a></li>
+                    </ul>
+                </td>
+            </tr>
+        </table>
+        </body></html>
+        '''
+
+        result = parse_composting(html)
+
+        assert isinstance(result, list)
+        assert len(result) == 6
+
+        # Check that all items are parsed
+        item_names = [t.inputs[0].name for t in result]
+        assert "Beetroot Seeds" in item_names
+        assert "Kelp" in item_names
+        assert "Cactus" in item_names
+        assert "Sugar Cane" in item_names
+        assert "Apple" in item_names
+        assert "Carrot" in item_names
+
+        # Check that all outputs are bone meal
+        for transformation in result:
+            assert len(transformation.outputs) == 1
+            assert transformation.outputs[0].name == "Bone Meal"
+
+    def test_parse_composting_success_rates(self):
+        """Test that success rates are correctly associated with items."""
+        from src.core.parsers import parse_composting
+
+        html = '''
+        <html><body>
+        <table class="wikitable">
+            <tr>
+                <td style="text-align:center">30%</td>
+                <td style="text-align:center">65%</td>
+            </tr>
+            <tr>
+                <th colspan="6">Items</th>
+            </tr>
+            <tr>
+                <td style="vertical-align:top">
+                    <ul>
+                        <li><a href="/w/Kelp" title="Kelp">Kelp</a></li>
+                    </ul>
+                </td>
+                <td style="vertical-align:top">
+                    <ul>
+                        <li><a href="/w/Apple" title="Apple">Apple</a></li>
+                    </ul>
+                </td>
+            </tr>
+        </table>
+        </body></html>
+        '''
+
+        result = parse_composting(html)
+
+        # Find transformations by item name
+        kelp_transformation = next(t for t in result if t.inputs[0].name == "Kelp")
+        apple_transformation = next(t for t in result if t.inputs[0].name == "Apple")
+
+        # Check success rates
+        assert kelp_transformation.metadata["success_rate"] == 0.3
+        assert apple_transformation.metadata["success_rate"] == 0.65
+
+    def test_parse_composting_deduplication(self):
+        """Test that duplicate items are deduplicated."""
+        from src.core.parsers import parse_composting
+
+        html = '''
+        <html><body>
+        <table class="wikitable">
+            <tr>
+                <td style="text-align:center">30%</td>
+            </tr>
+            <tr>
+                <th colspan="6">Items</th>
+            </tr>
+            <tr>
+                <td style="vertical-align:top">
+                    <ul>
+                        <li><a href="/w/Kelp" title="Kelp">Kelp</a></li>
+                        <li><a href="/w/Kelp" title="Kelp">Kelp</a></li>
+                    </ul>
+                </td>
+            </tr>
+        </table>
+        </body></html>
+        '''
+
+        result = parse_composting(html)
+
+        # Should only have one Kelp transformation despite duplicate links
+        assert len(result) == 1
+        assert result[0].inputs[0].name == "Kelp"
+
+    def test_parse_composting_no_items_header(self):
+        """Test that tables without Items header are skipped."""
+        from src.core.parsers import parse_composting
+
+        html = '''
+        <html><body>
+        <table class="wikitable">
+            <tr>
+                <th>Column 1</th>
+                <th>Column 2</th>
+            </tr>
+            <tr>
+                <td><a href="/w/Kelp" title="Kelp">Kelp</a></td>
+                <td>30%</td>
+            </tr>
+        </table>
+        </body></html>
+        '''
+
+        result = parse_composting(html)
+
+        # Should return empty list since there's no Items header
+        assert len(result) == 0
+
+    def test_parse_composting_transformation_type(self):
+        """Test that transformations have correct type."""
+        from src.core.parsers import parse_composting
+        from src.core.data_models import TransformationType
+
+        html = '''
+        <html><body>
+        <table class="wikitable">
+            <tr>
+                <td style="text-align:center">30%</td>
+            </tr>
+            <tr>
+                <th colspan="6">Items</th>
+            </tr>
+            <tr>
+                <td style="vertical-align:top">
+                    <ul>
+                        <li><a href="/w/Kelp" title="Kelp">Kelp</a></li>
+                    </ul>
+                </td>
+            </tr>
+        </table>
+        </body></html>
+        '''
+
+        result = parse_composting(html)
+
+        assert len(result) == 1
+        assert result[0].transformation_type == TransformationType.COMPOSTING
