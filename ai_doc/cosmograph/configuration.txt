@@ -1,0 +1,163 @@
+Configuration
+Data and Configuration Parameters
+
+The Cosmograph widget builds upon the native Cosmograph library, inheriting most of its configuration parameters, most of which are optional and can be modified in real-time.
+Minimal Configuration for Points
+
+To render a graph, the following minimal configuration is required:
+
+    points: Data in a pandas DataFrame format.
+    point_id_by: Unique identifier column for each point.
+
+Additional Points Configuration
+
+    point_index_by: Ordinal index of each point ranging from 0 to x (the number of unique points).
+    point_color_by: Column name for point colors.
+    point_size_by: Column name for point sizes.
+    point_size_range: Defines the range for automatic point size scaling.
+    point_label_by: Column name for associated point labels.
+    point_label_weight_by: Column name for point label weights.
+    point_x_by: Column name for the x-coordinate.
+    point_y_by: Column name for the y-coordinate.
+    point_cluster_by: The column name for the point clusters.
+    point_cluster_strength_by: The column that defines how strongly each point is attracted to its assigned cluster during the simulation.
+    point_include_columns: An array of additional column names to include in point data.
+
+Minimal Configuration for Links
+
+To define links, the following fields are necessary:
+
+    links: Data in a pandas DataFrame format.
+    link_source_by: Column with the unique identifier for source points.
+    link_target_by: Column with the unique identifier for target points.
+
+Additional Links Configuration
+
+    link_source_index_by: Index column of the source point, corresponding to point_index.
+    link_target_index_by: Index column of the target point, corresponding to point_index.
+    link_color_by: Column name for link colors.
+    link_width_by: Column name for link widths.
+    link_arrow_by: Column name that indicates links with arrows.
+    link_strength_by: Column name for link strengths.
+    link_strength_range: Defines the range for automatic link strength scaling.
+    link_include_columns: An array of additional column names to include in link data.
+
+Simulation Settings
+
+Various simulation settings allow for detailed customization:
+
+    disable_simulation: Prevents the simulation from running, merely rendering the graph. Default: None.
+    simulation_decay: Defines how quickly the simulation cools down. Default: 1000.
+    simulation_gravity: Coefficient for gravity force. Default: 0.
+    simulation_center: Centers the mass force coefficient. Default: 0.
+    simulation_repulsion: Configures point repulsion between points. Default: 0.1.
+    simulation_repulsion_theta: Decreases / increases the detalization of the Many-Body force calculations. When useQuadtree is set to True, this property corresponds to the Barnes–Hut approximation criterion. Default: 1.7.
+    simulation_link_spring: Spring constant for links. Default value: 1.
+    simulation_link_distance: Default distance for links. Default value: 2.
+    simulation_link_dist_random_variation_range: Random link distance range. Default value: [1, 1.2].
+    simulation_repulsion_from_mouse:  Mouse position repulsion coefficient, activated by right-click. Default value: 2.
+    simulation_friction: Sets simulation friction. Default value: 0.85.
+    simulation_cluster: Cluster coefficient. Default value: 0.1.
+
+Graph Appearance
+
+Customize the widget’s visual aspects:
+
+    background_color: Canvas background color. Default value: '#222222'.
+    space_size: Size of the simulation space. Default value: 4096.
+    point_color: Default point size when point_color_by not specified. Default value: '#b3b3b3'.
+    point_greyout_opacity: Opacity of unselected nodes during selection. Default value: 0.1.
+    point_size: The default size value to use for points when no point_size_by are provided. Default: 4.
+    point_size_scale: Scale factor for point sizes. Default value: 1.
+    hovered_point_cursor: Cursor type when hovering over a point. Default value: 'auto'.
+    render_hovered_point_ring: Enables ring around hovered points. Default value: False.
+    hovered_point_ring_color: Color of hovered point ring. Default value: 'white'.
+    focused_point_ring_color: Color of the focused point ring. Default value: 'white'.
+    focused_point_index: Index of the focused point, prioritized over focus_point method. Default value: None.
+    render_links: Enables or disables link rendering. Default value: True.
+    link_color: Default link color when link_color_by not specified. Default value: '#666666'.
+    link_greyout_opacity: Opacity of unselected links during selection. Default value: 0.1.
+    link_width: Default link width when link_width_by not specified. Default value: 1.
+    link_width_scale: Scale factor for link widths. Default value: 1.
+    curved_links: Enables or disables curved links. Default value: False.
+    curved_link_segments: Segments defining curved links. Default value: 19.
+    curved_link_weight: Weight factor for link curvature. Default value: 0.8.
+    curved_link_control_point_distance: Control point positioning for curves. If set to 1 then the control point is at a distance equal to the length of the line. Default value: 0.5.
+    link_arrows: Enables or disables arrows on links when link_arrow_by not specified. Default value: False.
+    link_arrows_size_scale: Scale factor for link arrow size. Default value: 1.
+    link_visibility_distance_range: Pixel distance range for link transparency. Default value: [50, 150].
+    link_visibility_min_transparency: Minimum transparency of links based on link_visibility_distance_range. Default value: 0.25.
+    scale_points_on_zoom: Scales point sizes when zooming. Default value: True.
+    initial_zoom_level: Starting zoom level. Default value: None.
+    disable_zoom: Enables or disables zooming. Default value: False.
+    enable_drag: Allows graph dragging. Default value: False.
+    fit_view_on_init: Automatically fits view to all points upon initialization. Default value: True.
+    fit_view_delay: Delay for fitting view after initialization in milliseconds. Default value: 250.
+    fit_view_padding: Padding around fit view area. Default value: 0.1.
+    fit_view_duration: Animation duration for view fitting in milliseconds. Default value: 250.
+    fit_view_by_points_in_rect: Fits view to specified rectangle of points, active when fit_view_on_init is True. Default value: None.
+
+Labels
+
+Control label display on the graph:
+
+    show_labels: Whether to show labels (except hovered) on the canvas. Default value: False.
+    show_dynamic_labels: Flag to show dynamic labels for visible points. Default value: False.
+    show_top_labels: Flag to display labels for the top points. Default values: False.
+    show_top_labels_limit: Maximum number of top points to show labels for. Default value: 100.
+    show_top_labels_by: Column to determine which points are considered as a top. If not provided, the top points will be sorted by their total links count. Default value: None.
+    show_labels_for: An array of point ids for which to show labels. Default value: None.
+    static_label_weight: Weight of static labels. Default value: 0.8.
+    dynamic_label_weight: Weight of dynamic labels. Default value: 0.7.
+    label_margin: Specifies the margin between the label and the point. Default value: 5.
+    show_hovered_point_label: Flag to display the label for the currently hovered point. Default value: False.
+
+Additional Parameters
+
+Various additional parameters enhance functionality:
+
+    show_FPS_monitor: Display an FPS counter in the upper right corner of the canvas. Default value: False.
+    pixel_ratio: Canvas pixel ratio. Default value: 2.
+    random_seed: Seed value for generating random numbers in simulations. Default value: None.
+    point_sampling_distance: Distance threshold for sampling points. Default value: 150.
+
+Methods and Values
+
+The Cosmograph widget provides several methods for data interaction:
+
+    select_point_by_id(id): Selects point by id.
+    select_point_by_index(index): Selects point by index.
+    select_points_by_ids(ids): Selects points by ids.
+    select_points_by_indices(indices): Selects points by indices.
+    activate_rect_selection(): Activates rectangular selection.
+    deactivate_rect_selection(): Deactivates rectangular selection.
+    fit_view(): Center and zoom in/out the view to fit all points in the scene.
+    fit_view_by_ids(ids, duration, padding): Center and zoom in/out the viewport to fit points by their ids.
+    fit_view_by_indices(indices, duration, padding): Center and zoom in/out the viewport to fit points by their indices.
+    fit_view_by_coordinates(coordinates, duration, padding): Fit the given coordinates into the viewport.
+    focus_point(id): Set focus on a point by id. A ring will be drawn around the focused point.
+    focus_point_by_index(index): Set focus on a point by index. A ring will be drawn around the focused point.
+    start(alpha): Starts the simulation.
+    pause(): Pause the simulation.
+    restart(): Restarts the simulation.
+    step(): Render only one frame of the simulation.
+
+Values
+
+    clicked_point_id: Point id that currently clicked.
+    clicked_point_index: Point index that currently clicked.
+    selected_point_ids: Point ids that currently selected.
+    selected_point_indices: Point indices that currently selected.
+
+Legends
+
+    disable_point_color_legend: Disable point color legend.
+    disable_point_size_legend: Disable point size legend.
+    disable_link_color_legend: Disable link color legend.
+    disable_link_width_legend: Disable link width legend.
+
+Quadtree algorithm settings (Experimental)
+
+    use_quadtree: Activates quadtree algorithm for Many-Body force when set to True. Default value: False.
+    simulation_repulsion_quadtree_levels: Barnes–Hut approximation depth, usable when useQuadtree is set to True. Default value: 12.
+

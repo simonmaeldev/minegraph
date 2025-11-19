@@ -17,6 +17,7 @@ WIKI_PAGES: Dict[str, str] = {
     "smelting": "https://minecraft.wiki/w/Smelting",
     "smithing": "https://minecraft.wiki/w/Smithing",
     "stonecutter": "https://minecraft.wiki/w/Stonecutter",
+    "tool": "https://minecraft.wiki/w/Tool",
     "trading": "https://minecraft.wiki/w/Trading",
 }
 

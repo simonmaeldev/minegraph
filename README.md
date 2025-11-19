@@ -141,7 +141,7 @@ uv run python src/download_item_images.py --help
 
 ### Visualize Transformation Graph
 
-Minegraph provides two visualization options: **static 2D graphs** (Graphviz) and **interactive 3D graphs** (NetworkX + Matplotlib).
+Minegraph provides three visualization options: **static 2D graphs** (Graphviz), **interactive 3D graphs** (NetworkX + Matplotlib), and **interactive web-based graphs** (Cosmograph).
 
 #### Option 1: 2D Graph Visualization (Graphviz)
 
@@ -243,22 +243,63 @@ To bypass interactive mode, either:
 - **Intermediate Nodes**: Multi-input transformations use small gray intermediate nodes
 - **No System Dependencies**: Uses NetworkX and Matplotlib (already included), no need to install Graphviz
 
-**Comparison: 2D vs 3D Visualization**
+#### Option 3: Interactive Web-Based Visualization (Cosmograph)
 
-| Aspect | 2D (Graphviz) | 3D (NetworkX + Matplotlib) |
-|--------|---------------|----------------------------|
-| Layout | Hierarchical, static | Spring (force-directed), spatial |
-| Interactivity | None (static images) | Full rotation, zoom, pan |
-| Readability | Can be cluttered with large graphs | Better use of 3D space |
-| Output | SVG, PNG, PDF files | Interactive window + optional save |
-| Performance | Fast for large graphs | Slower layout computation |
-| Filtering | By transformation type (`-t` flag) | By transformation type (`--filter-type` flag) |
-| Option Selection | Command-line only | Interactive fzf menu or command-line |
-| Best for | Detailed static analysis, print | Exploration and understanding |
+Generate GPU-accelerated interactive graph visualizations in Jupyter notebooks:
+
+```bash
+# First, ensure dependencies are installed
+uv add cosmograph jupyter
+
+# Start Jupyter notebook
+uv run jupyter notebook notebooks/cosmograph_visualization.ipynb
+
+# Alternative: Start JupyterLab
+uv run jupyter lab
+```
+
+**Cosmograph Features:**
+- **GPU-Accelerated Rendering**: Smooth 60 FPS animations even with 2000+ nodes
+- **Modern Web Interface**: Zoom, pan, and hover in your browser
+- **Force-Directed Layout**: Natural clustering of related items
+- **Smart Node Sizing**: More connected items appear larger
+- **Hover Tooltips**: See item names on hover
+- **Directional Arrows**: Shows transformation flow
+- **Color-Coded Edges**: Uses same color configuration as other visualizations
+- **No System Dependencies**: Pure Python package, no Graphviz installation needed
+- **Export to HTML**: Share interactive visualizations with others
+- **Notebook Integration**: Combine analysis code with visualization
+
+**Getting Started:**
+
+1. Install dependencies: `uv add cosmograph jupyter`
+2. Open the notebook: `uv run jupyter notebook notebooks/cosmograph_visualization.ipynb`
+3. Execute all cells (Kernel → Restart & Run All)
+4. Interact with the graph: zoom, pan, hover over nodes
+
+The notebook includes examples for:
+- Basic visualization with all transformations
+- Filtering by transformation type
+- Customizing colors and layout
+- Exporting to HTML
+
+**Comparison: 2D vs 3D vs Web Visualization**
+
+| Aspect | 2D (Graphviz) | 3D (NetworkX + Matplotlib) | Web (Cosmograph) |
+|--------|---------------|----------------------------|------------------|
+| Layout | Hierarchical, static | Spring (force-directed), spatial | Force-directed, dynamic |
+| Interactivity | None (static images) | Full rotation, zoom, pan | Zoom, pan, hover, drag |
+| Performance | Fast for large graphs | Slower layout computation | GPU-accelerated, very smooth |
+| Output | SVG, PNG, PDF files | Interactive window + optional save | Interactive notebook widget + HTML export |
+| Environment | Command-line script | Command-line script | Jupyter notebook |
+| Dependencies | System graphviz + Python package | NetworkX + Matplotlib | Pure Python (cosmograph) |
+| Best for | Detailed static analysis, print | 3D exploration | Web-based exploration, sharing |
+| Filtering | By transformation type (`-t` flag) | By transformation type (`--filter-type` flag) | Programmatic filtering in notebook |
+| Option Selection | Command-line only | Interactive fzf menu or command-line | Jupyter cells |
 
 **Customizing Colors:**
 
-Edit `config/graph_colors.txt` to customize the colors for different transformation types (applies to both 2D and 3D visualizations):
+Edit `config/graph_colors.txt` to customize the colors for different transformation types (applies to all visualizations: 2D, 3D, and Cosmograph):
 
 ```
 # Example configuration
@@ -272,13 +313,14 @@ Colors can be hex codes (e.g., `#4A90E2`) or standard color names (e.g., `blue`)
 
 **Performance Note:**
 
-With 1961+ transformations, the full graph is very large and complex:
+With 2200+ transformations, the full graph is very large and complex:
 - **2D Graphviz**: Use the `-t` flag to filter by transformation type for better readability
 - **3D Visualization**: Use the `--filter-type` flag to focus on specific transformation types
-- Layout computation may take 5-30 seconds for full graph; filtering significantly improves performance
+- **Cosmograph**: GPU-accelerated, handles the full graph smoothly without filtering
+- Layout computation may take 5-30 seconds for full graph in 2D/3D; filtering significantly improves performance
 - Interactive rotation remains smooth even with large graphs
 - View SVG files in a browser for pan/zoom capabilities
-- 3D visualization provides better spatial separation for large, interconnected graphs
+- Cosmograph provides the best performance for exploring the complete graph interactively
 
 ## Output Format
 

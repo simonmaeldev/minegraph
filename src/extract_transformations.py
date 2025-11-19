@@ -19,6 +19,7 @@ from core.parsers import (
     parse_smelting,
     parse_smithing,
     parse_stonecutter,
+    parse_tool_crafting,
     parse_trading,
 )
 
@@ -66,6 +67,7 @@ def extract_all_transformations(data_dir: str = "ai_doc/downloaded_pages") -> Li
         "smelting.html": parse_smelting,
         "smithing.html": parse_smithing,
         "stonecutter.html": parse_stonecutter,
+        "tool.html": parse_tool_crafting,
         "trading.html": parse_trading,
     }
 

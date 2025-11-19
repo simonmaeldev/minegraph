@@ -453,6 +453,205 @@ def parse_crafting(html_content: str) -> List[Transformation]:
     return transformations
 
 
+def parse_tool_crafting(html_content: str) -> List[Transformation]:
+    """
+    Parse tool crafting recipes from the Tool wiki page HTML content.
+
+    This parser handles the crafting section table on the Tool page which
+    includes animated/cycling recipe graphics showing alternative ingredients.
+
+    Args:
+        html_content: HTML content from the Tool wiki page
+
+    Returns:
+        List of Transformation objects for tool crafting recipes (deduplicated)
+    """
+    soup = BeautifulSoup(html_content, "lxml")
+    transformations: List[Transformation] = []
+    seen_signatures = set()
+
+    # Find all crafting table UI elements
+    crafting_uis = soup.find_all("span", class_=re.compile(r"mcui.*Crafting.*Table"))
+
+    for ui in crafting_uis:
+        if not is_java_edition(ui):
+            continue
+
+        # Skip recipes in excluded sections (Removed/Changed recipes)
+        if is_in_excluded_section(ui):
+            continue
+
+        # Extract inputs from mcui-input section
+        input_section = ui.find("span", class_="mcui-input")
+        if not input_section:
+            continue
+
+        # Collect all input items
+        input_items: List[Item] = []
+        slots = input_section.find_all("span", class_="invslot")
+
+        # Track if any slot has alternatives
+        has_alternatives = False
+        alternative_slots: List[List[Item]] = []
+
+        for slot in slots:
+            items_in_slot = find_item_in_slot(slot)
+            if items_in_slot:
+                if len(items_in_slot) > 1:
+                    has_alternatives = True
+                    alternative_slots.append(items_in_slot)
+                else:
+                    input_items.append(items_in_slot[0])
+
+        # Extract output from mcui-output section
+        output_section = ui.find("span", class_="mcui-output")
+        if not output_section:
+            continue
+
+        output_items = find_item_in_slot(output_section)
+        if not output_items:
+            continue
+
+        # Extract category from DOM context
+        category = extract_category_from_element(ui)
+
+        # If there are alternatives, create separate transformations for each
+        if has_alternatives and alternative_slots:
+            # Check if output also has alternatives (multiple items in output slot)
+            has_output_alternatives = len(output_items) > 1
+
+            # Check if all alternative slots have the same count (for pairing)
+            all_counts_match = len(set(len(slot) for slot in alternative_slots)) == 1
+            first_slot_count = len(alternative_slots[0])
+
+            # Check if output count matches any alternative slot count (for guided pairing)
+            output_count = len(output_items)
+            output_matches_slot = has_output_alternatives and any(
+                len(slot) == output_count for slot in alternative_slots
+            )
+
+            # When multiple alternative slots exist and output provides guidance OR counts match
+            if len(alternative_slots) >= 2 and (all_counts_match or output_matches_slot):
+                # When output provides guidance, iterate by output items to ensure correct pairing
+                if has_output_alternatives and output_matches_slot:
+                    for output_idx, output_item in enumerate(output_items):
+                        # For each alternative slot, find the matching item by index
+                        paired_inputs = []
+                        for slot in alternative_slots:
+                            if len(slot) == len(output_items):
+                                # Exact match: use same index
+                                paired_inputs.append(slot[output_idx])
+                            elif len(slot) > len(output_items):
+                                # Slot has extra items: try to find item matching output by name
+                                matching_item = None
+                                for item in slot:
+                                    if item.name == output_item.name:
+                                        matching_item = item
+                                        break
+                                if matching_item:
+                                    paired_inputs.append(matching_item)
+                                else:
+                                    # Fallback: use index+1 to skip potential base item at index 0
+                                    idx = min(output_idx + 1, len(slot) - 1)
+                                    paired_inputs.append(slot[idx])
+                            else:
+                                # Slot has fewer items: cycle using modulo
+                                paired_inputs.append(slot[output_idx % len(slot)])
+
+                        metadata = {"has_alternatives": True}
+                        if category:
+                            metadata["category"] = category
+                        transformation = Transformation(
+                            transformation_type=TransformationType.CRAFTING,
+                            inputs=input_items + paired_inputs,
+                            outputs=[output_item],
+                            metadata=metadata,
+                        )
+                        sig = transformation.get_signature()
+                        if sig not in seen_signatures:
+                            seen_signatures.add(sig)
+                            transformations.append(transformation)
+                else:
+                    # All counts match: simple zip pairing
+                    for alt_items_tuple in zip(*alternative_slots):
+                        all_inputs = input_items + list(alt_items_tuple)
+
+                        # Determine output by index
+                        if has_output_alternatives and first_slot_count == len(output_items):
+                            output_idx = alternative_slots[0].index(alt_items_tuple[0])
+                            output = [output_items[output_idx]]
+                        else:
+                            output = [output_items[0]]
+
+                        metadata = {"has_alternatives": True}
+                        if category:
+                            metadata["category"] = category
+                        transformation = Transformation(
+                            transformation_type=TransformationType.CRAFTING,
+                            inputs=all_inputs,
+                            outputs=output,
+                            metadata=metadata,
+                        )
+                        sig = transformation.get_signature()
+                        if sig not in seen_signatures:
+                            seen_signatures.add(sig)
+                            transformations.append(transformation)
+            # When both input and output have same number of alternatives, pair them by index
+            elif has_output_alternatives and first_slot_count == len(output_items):
+                for i, alt_item in enumerate(alternative_slots[0]):
+                    all_inputs = input_items + [alt_item]
+                    metadata = {"has_alternatives": True}
+                    if category:
+                        metadata["category"] = category
+                    transformation = Transformation(
+                        transformation_type=TransformationType.CRAFTING,
+                        inputs=all_inputs,
+                        outputs=[output_items[i]],  # Match by index
+                        metadata=metadata,
+                    )
+                    # Only add if not seen before
+                    sig = transformation.get_signature()
+                    if sig not in seen_signatures:
+                        seen_signatures.add(sig)
+                        transformations.append(transformation)
+            else:
+                # Input has alternatives but output is single or different count
+                # Create one transformation per input alternative with same output
+                for alt_item in alternative_slots[0]:
+                    all_inputs = input_items + [alt_item]
+                    metadata = {"has_alternatives": True}
+                    if category:
+                        metadata["category"] = category
+                    transformation = Transformation(
+                        transformation_type=TransformationType.CRAFTING,
+                        inputs=all_inputs,
+                        outputs=[output_items[0]],  # Use first (only) output
+                        metadata=metadata,
+                    )
+                    # Only add if not seen before
+                    sig = transformation.get_signature()
+                    if sig not in seen_signatures:
+                        seen_signatures.add(sig)
+                        transformations.append(transformation)
+        elif input_items:
+            metadata = {}
+            if category:
+                metadata["category"] = category
+            transformation = Transformation(
+                transformation_type=TransformationType.CRAFTING,
+                inputs=input_items,
+                outputs=[output_items[0]],  # Always use single output
+                metadata=metadata,
+            )
+            # Only add if not seen before
+            sig = transformation.get_signature()
+            if sig not in seen_signatures:
+                seen_signatures.add(sig)
+                transformations.append(transformation)
+
+    return transformations
+
+
 def parse_smelting(html_content: str) -> List[Transformation]:
     """
     Parse smelting recipes from HTML content.

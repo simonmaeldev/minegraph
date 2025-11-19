@@ -31,3 +31,6 @@ composting=#27AE60
 
 # Grindstone transformations (grindstone recipes)
 grindstone=#34495E
+
+# Bartering transformations (piglin bartering)
+bartering=#D4AF37
