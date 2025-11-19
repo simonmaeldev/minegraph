@@ -8,15 +8,16 @@ from typing import Dict
 
 
 WIKI_PAGES: Dict[str, str] = {
-    "crafting": "https://minecraft.wiki/w/Crafting",
-    "smelting": "https://minecraft.wiki/w/Smelting",
-    "trading": "https://minecraft.wiki/w/Trading",
-    "smithing": "https://minecraft.wiki/w/Smithing",
-    "stonecutter": "https://minecraft.wiki/w/Stonecutter",
-    "drops": "https://minecraft.wiki/w/Drops",
+    "bartering": "https://minecraft.wiki/w/Bartering",
     "brewing": "https://minecraft.wiki/w/Brewing",
     "composting": "https://minecraft.wiki/w/Composter",
+    "crafting": "https://minecraft.wiki/w/Crafting",
+    "drops": "https://minecraft.wiki/w/Drops",
     "grindstone": "https://minecraft.wiki/w/Grindstone",
+    "smelting": "https://minecraft.wiki/w/Smelting",
+    "smithing": "https://minecraft.wiki/w/Smithing",
+    "stonecutter": "https://minecraft.wiki/w/Stonecutter",
+    "trading": "https://minecraft.wiki/w/Trading",
 }
 
 # Complete mob list for drops extraction (from https://minecraft.wiki/w/Mob)

@@ -7,17 +7,18 @@ from typing import Any, Dict, List
 
 class TransformationType(Enum):
     """Types of transformations in Minecraft."""
-    CRAFTING = "crafting"
-    SMELTING = "smelting"
+    BARTERING = "bartering"
     BLAST_FURNACE = "blast_furnace"
-    SMOKER = "smoker"
-    SMITHING = "smithing"
-    STONECUTTER = "stonecutter"
-    TRADING = "trading"
-    MOB_DROP = "mob_drop"
     BREWING = "brewing"
     COMPOSTING = "composting"
+    CRAFTING = "crafting"
     GRINDSTONE = "grindstone"
+    MOB_DROP = "mob_drop"
+    SMELTING = "smelting"
+    SMITHING = "smithing"
+    SMOKER = "smoker"
+    STONECUTTER = "stonecutter"
+    TRADING = "trading"
 
 
 @dataclass(frozen=True)

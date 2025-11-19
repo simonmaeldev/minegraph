@@ -6,15 +6,16 @@ A Python-based data extraction system for Minecraft Java Edition transformation 
 
 Minegraph extracts transformation data from the Minecraft Wiki to create structured datasets showing how items can be transformed through various game mechanics:
 
+- **Bartering** (piglin bartering)
+- **Brewing** (potions)
+- **Composting** (organic items to bone meal)
 - **Crafting** (shaped and shapeless recipes)
+- **Grindstone** (disenchanting)
+- **Mob drops** (with probabilities)
 - **Smelting** (furnace, blast furnace, smoker)
 - **Smithing** (netherite upgrades, armor trims)
 - **Stonecutting**
 - **Trading** (villager trades)
-- **Mob drops** (with probabilities)
-- **Brewing** (potions)
-- **Composting** (organic items to bone meal)
-- **Grindstone** (disenchanting)
 
 The output consists of two CSV files:
 - `output/items.csv` - All unique items with their wiki URLs

@@ -27,6 +27,7 @@ Angler Pottery Sherd,https://minecraft.wiki/w/Angler_Pottery_Sherd
 Anvil,https://minecraft.wiki/w/Anvil
 Apple,https://minecraft.wiki/w/Apple
 Archer Pottery Sherd,https://minecraft.wiki/w/Archer_Pottery_Sherd
+Armadillo,https://minecraft.wiki/w/Armadillo
 Armadillo Scute,https://minecraft.wiki/w/Armadillo_Scute
 Armor Stand,https://minecraft.wiki/w/Armor_Stand
 Arms Up Pottery Sherd,https://minecraft.wiki/w/Arms_Up_Pottery_Sherd
@@ -214,6 +215,7 @@ Carrot,https://minecraft.wiki/w/Carrot
 Carrot on a Stick,https://minecraft.wiki/w/Carrot_on_a_Stick
 Cartography Table,https://minecraft.wiki/w/Cartography_Table
 Carved Pumpkin,https://minecraft.wiki/w/Carved_Pumpkin
+Cat,https://minecraft.wiki/w/Cat
 Cauldron,https://minecraft.wiki/w/Cauldron
 Chain,https://minecraft.wiki/w/Chain
 Chainmail Boots,https://minecraft.wiki/w/Chainmail_Boots
@@ -304,7 +306,6 @@ Copper Sword,https://minecraft.wiki/w/Copper_Sword
 Copper Torch,https://minecraft.wiki/w/Copper_Torch
 Copper Trapdoor,https://minecraft.wiki/w/Copper_Trapdoor
 Cornflower,https://minecraft.wiki/w/Cornflower
-Cow,https://minecraft.wiki/w/Cow
 Cracked Deepslate Bricks,https://minecraft.wiki/w/Cracked_Deepslate_Bricks
 Cracked Deepslate Tiles,https://minecraft.wiki/w/Cracked_Deepslate_Tiles
 Cracked Nether Bricks,https://minecraft.wiki/w/Cracked_Nether_Bricks
@@ -313,7 +314,6 @@ Cracked Stone Bricks,https://minecraft.wiki/w/Cracked_Stone_Bricks
 Crafter,https://minecraft.wiki/w/Crafter
 Crafting Table,https://minecraft.wiki/w/Crafting_Table
 Creaking Heart,https://minecraft.wiki/w/Creaking_Heart
-Creeper,https://minecraft.wiki/w/Creeper
 Creeper Charge Banner Pattern,https://minecraft.wiki/w/Creeper_Charge_Banner_Pattern
 Creeper Head,https://minecraft.wiki/w/Creeper_Head
 Crimson Button,https://minecraft.wiki/w/Crimson_Button
@@ -489,6 +489,7 @@ Flower Pot,https://minecraft.wiki/w/Flower_Pot
 Flowering Azalea,https://minecraft.wiki/w/Flowering_Azalea
 Flowering Azalea Leaves,https://minecraft.wiki/w/Flowering_Azalea_Leaves
 Flowers,https://minecraft.wiki/w/Flowers
+Fox,https://minecraft.wiki/w/Fox
 Friend Pottery Sherd,https://minecraft.wiki/w/Friend_Pottery_Sherd
 Furnace,https://minecraft.wiki/w/Furnace
 Ghast Tear,https://minecraft.wiki/w/Ghast_Tear
@@ -570,6 +571,7 @@ Hopper,https://minecraft.wiki/w/Hopper
 Host Armor Trim,https://minecraft.wiki/w/Host_Armor_Trim_Smithing_Template
 Howl Pottery Sherd,https://minecraft.wiki/w/Howl_Pottery_Sherd
 Ice,https://minecraft.wiki/w/Ice
+Ink Sac,https://minecraft.wiki/w/Ink_Sac
 Iron Axe,https://minecraft.wiki/w/Iron_Axe
 Iron Bars,https://minecraft.wiki/w/Iron_Bars
 Iron Boots,https://minecraft.wiki/w/Iron_Boots
@@ -765,7 +767,6 @@ Mushroom Stem,https://minecraft.wiki/w/Mushroom_Stem
 Mushroom Stew,https://minecraft.wiki/w/Mushroom_Stew
 Mushrooms,https://minecraft.wiki/w/Mushrooms
 Music Disc,https://minecraft.wiki/w/Music_Disc_5
-Music Disc Lava Chicken,https://minecraft.wiki/w/Music_Disc_Lava_Chicken
 Name Tag,https://minecraft.wiki/w/Name_Tag
 Nautilus Shell,https://minecraft.wiki/w/Nautilus_Shell
 Nether Brick,https://minecraft.wiki/w/Nether_Brick
@@ -874,7 +875,7 @@ Pale Oak Wood,https://minecraft.wiki/w/Pale_Oak_Wood
 Paper,https://minecraft.wiki/w/Paper
 Peony,https://minecraft.wiki/w/Peony
 Phantom Membrane,https://minecraft.wiki/w/Phantom_Membrane
-Pig,https://minecraft.wiki/w/Pig
+Phantom membrane,https://minecraft.wiki/w/Phantom_membrane
 Pink Banner,https://minecraft.wiki/w/Pink_Banner
 Pink Bed,https://minecraft.wiki/w/Pink_Bed
 Pink Bundle,https://minecraft.wiki/w/Pink_Bundle
@@ -926,6 +927,7 @@ Polished Tuff Wall,https://minecraft.wiki/w/Polished_Tuff_Wall
 Popped Chorus Fruit,https://minecraft.wiki/w/Popped_Chorus_Fruit
 Poppy,https://minecraft.wiki/w/Poppy
 Potato,https://minecraft.wiki/w/Potato
+Potion of Fire Resistance,https://minecraft.wiki/w/Potion_of_Fire_Resistance
 Potion of Healing,https://minecraft.wiki/w/Potion_of_Healing
 Potion of Night Vision,https://minecraft.wiki/w/Potion_of_Night_Vision
 Potion of Strength,https://minecraft.wiki/w/Potion_of_Strength
@@ -970,7 +972,9 @@ Quartz Slab,https://minecraft.wiki/w/Quartz_Slab
 Quartz Stairs,https://minecraft.wiki/w/Quartz_Stairs
 Rabbit Hide,https://minecraft.wiki/w/Rabbit_Hide
 Rabbit Stew,https://minecraft.wiki/w/Rabbit_Stew
+Rabbit hide,https://minecraft.wiki/w/Rabbit_hide
 Rabbit's Foot,https://minecraft.wiki/w/Rabbit%27s_Foot
+Rabbit's foot,https://minecraft.wiki/w/Rabbit%27s_foot
 Rail,https://minecraft.wiki/w/Rail
 Raiser Armor Trim,https://minecraft.wiki/w/Raiser_Armor_Trim_Smithing_Template
 Raw Beef,https://minecraft.wiki/w/Raw_Beef
@@ -983,6 +987,7 @@ Raw Mutton,https://minecraft.wiki/w/Raw_Mutton
 Raw Porkchop,https://minecraft.wiki/w/Raw_Porkchop
 Raw Rabbit,https://minecraft.wiki/w/Raw_Rabbit
 Raw Salmon,https://minecraft.wiki/w/Raw_Salmon
+Raw chicken,https://minecraft.wiki/w/Raw_chicken
 Recovery Compass,https://minecraft.wiki/w/Recovery_Compass
 Red Banner,https://minecraft.wiki/w/Red_Banner
 Red Bed,https://minecraft.wiki/w/Red_Bed
@@ -1025,6 +1030,7 @@ Respawn Anchor,https://minecraft.wiki/w/Respawn_Anchor
 Rib Armor Trim,https://minecraft.wiki/w/Rib_Armor_Trim_Smithing_Template
 Rose Bush,https://minecraft.wiki/w/Rose_Bush
 Rotten Flesh,https://minecraft.wiki/w/Rotten_Flesh
+Rotten flesh,https://minecraft.wiki/w/Rotten_flesh
 Saddle,https://minecraft.wiki/w/Saddle
 Sand,https://minecraft.wiki/w/Sand
 Sandstone,https://minecraft.wiki/w/Sandstone
@@ -1046,8 +1052,6 @@ Shroomlight,https://minecraft.wiki/w/Shroomlight
 Shulker Box,https://minecraft.wiki/w/Shulker_Box
 Shulker Shell,https://minecraft.wiki/w/Shulker_Shell
 Silence Armor Trim,https://minecraft.wiki/w/Silence_Armor_Trim_Smithing_Template
-Skeleton,https://minecraft.wiki/w/Skeleton
-Skeleton Skull,https://minecraft.wiki/w/Skeleton_Skull
 Skull Charge Banner Pattern,https://minecraft.wiki/w/Skull_Charge_Banner_Pattern
 Skull Pottery Sherd,https://minecraft.wiki/w/Skull_Pottery_Sherd
 Slime Block,https://minecraft.wiki/w/Slime_Block
@@ -1080,6 +1084,7 @@ Soul Torch,https://minecraft.wiki/w/Soul_Torch
 Spectral Arrow,https://minecraft.wiki/w/Spectral_Arrow
 Spider Eye,https://minecraft.wiki/w/Spider_Eye
 Spire Armor Trim,https://minecraft.wiki/w/Spire_Armor_Trim_Smithing_Template
+Splash Potion of Fire Resistance,https://minecraft.wiki/w/Splash_Potion_of_Fire_Resistance
 Sponge,https://minecraft.wiki/w/Sponge
 Spore Blossom,https://minecraft.wiki/w/Spore_Blossom
 Spruce Boat,https://minecraft.wiki/w/Spruce_Boat
@@ -1318,5 +1323,3 @@ Yellow Stained Glass,https://minecraft.wiki/w/Yellow_Stained_Glass
 Yellow Stained Glass Pane,https://minecraft.wiki/w/Yellow_Stained_Glass_Pane
 Yellow Terracotta,https://minecraft.wiki/w/Yellow_Terracotta
 Yellow Wool,https://minecraft.wiki/w/Yellow_Wool
-Zombie,https://minecraft.wiki/w/Zombie
-Zombie Head,https://minecraft.wiki/w/Zombie_Head

@@ -75,7 +75,7 @@ EDUCATION_EDITION_ITEMS = {
     "Glue",
     "Hydrogen Peroxide",
     "Ice Bomb",
-    "Ink Sac",  # Note: Java Edition has this, but Education has special chemistry version
+    # "Ink Sac" removed - Java Edition has this as a mob drop from squids
     "Iron Sulfide",
     "Latex",
     "Lithium Hydride",

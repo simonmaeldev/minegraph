@@ -10,15 +10,16 @@ from typing import List, Set
 
 from core.data_models import Item, Transformation
 from core.parsers import (
+    parse_bartering,
+    parse_brewing,
+    parse_composting,
     parse_crafting,
+    parse_grindstone,
+    parse_mob_drops,
     parse_smelting,
     parse_smithing,
     parse_stonecutter,
     parse_trading,
-    parse_mob_drops,
-    parse_brewing,
-    parse_composting,
-    parse_grindstone,
 )
 
 # Configure logging
@@ -57,14 +58,15 @@ def extract_all_transformations(data_dir: str = "ai_doc/downloaded_pages") -> Li
 
     # Parse main wiki pages
     parsers = {
+        "bartering.html": parse_bartering,
+        "brewing.html": parse_brewing,
+        "composting.html": parse_composting,
         "crafting.html": parse_crafting,
+        "grindstone.html": parse_grindstone,
         "smelting.html": parse_smelting,
         "smithing.html": parse_smithing,
         "stonecutter.html": parse_stonecutter,
         "trading.html": parse_trading,
-        "brewing.html": parse_brewing,
-        "composting.html": parse_composting,
-        "grindstone.html": parse_grindstone,
     }
 
     for filename, parser_func in parsers.items():

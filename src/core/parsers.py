@@ -818,6 +818,67 @@ def parse_trading(html_content: str) -> List[Transformation]:
     return transformations
 
 
+def extract_items_from_element(element: Tag) -> List[Item]:
+    """
+    Extract all items from an element by finding item links.
+
+    Args:
+        element: BeautifulSoup Tag to search for item links
+
+    Returns:
+        List of unique Item objects found in the element
+    """
+    items = []
+    seen_names = set()
+
+    # Find all links with /w/ pattern
+    links = element.find_all("a", href=re.compile(r"^/w/"))
+
+    for link in links:
+        item = extract_item_from_link(link)
+        if item and item.name not in seen_names:
+            # Skip experience-related items (not actual items)
+            if "experience" in item.name.lower() or "xp" in item.name.lower():
+                continue
+            seen_names.add(item.name)
+            items.append(item)
+
+    return items
+
+
+def find_subsections(heading: Tag) -> List[tuple[Tag, Tag]]:
+    """
+    Find all h3 subsections under a given h2 heading.
+
+    Args:
+        heading: BeautifulSoup Tag representing an h2 or h3 heading
+
+    Returns:
+        List of (subsection_heading, content_container) tuples
+    """
+    subsections = []
+
+    # Find the next h2 to know where this section ends
+    next_h2 = heading.find_next_sibling("h2")
+
+    # Find all h3 elements between this heading and the next h2
+    current = heading.find_next_sibling()
+    while current:
+        # Stop if we hit the next h2 section
+        if current.name == "h2":
+            break
+        if next_h2 and current == next_h2:
+            break
+
+        # If this is an h3, it's a subsection
+        if current.name == "h3":
+            subsections.append((current, current))
+
+        current = current.find_next_sibling()
+
+    return subsections
+
+
 def parse_mob_drops(html_content: str, mob_name: str) -> List[Transformation]:
     """
     Parse mob drop data from HTML content.
@@ -833,8 +894,61 @@ def parse_mob_drops(html_content: str, mob_name: str) -> List[Transformation]:
     transformations: List[Transformation] = []
     seen_signatures = set()
 
+    # Create virtual mob item
+    mob_item = Item(name=mob_name, url=f"https://minecraft.wiki/w/{mob_name.replace(' ', '_')}")
+
+    def _add_transformation(item: Item, probability: float = 1.0):
+        """Helper to add a transformation with deduplication."""
+        transformation = Transformation(
+            transformation_type=TransformationType.MOB_DROP,
+            inputs=[mob_item],
+            outputs=[item],
+            metadata={"probability": probability},
+        )
+        sig = transformation.get_signature()
+        if sig not in seen_signatures:
+            seen_signatures.add(sig)
+            transformations.append(transformation)
+
+    def _parse_drops_table(table: Tag):
+        """Parse items from a drops table."""
+        if not is_java_edition(table):
+            return
+
+        rows = table.find_all("tr")[1:]  # Skip header
+        for row in rows:
+            cells = row.find_all("td")
+            if len(cells) < 1:
+                continue
+
+            # First cell usually contains item
+            item_cell = cells[0]
+            links = item_cell.find_all("a", href=re.compile(r"^/w/"))
+
+            for link in links:
+                item = extract_item_from_link(link)
+                if item:
+                    # Skip experience-related items (not actual items)
+                    if "experience" in item.name.lower() or "xp" in item.name.lower():
+                        continue
+                    # Try to extract probability if present
+                    probability = 1.0
+                    if len(cells) > 2:
+                        prob_text = cells[2].get_text(strip=True)
+                        if "%" in prob_text:
+                            try:
+                                probability = float(prob_text.replace("%", "")) / 100.0
+                            except ValueError:
+                                pass
+                    _add_transformation(item, probability)
+
     # Find "Drops" section
     drops_section = soup.find(id="Drops")
+    if drops_section:
+        # If we found a span with id="Drops", get its parent (the h2/h3 element)
+        if drops_section.name == "span":
+            drops_section = drops_section.find_parent(["h2", "h3"])
+
     if not drops_section:
         # Try finding h2/h3 with "Drops" text
         for heading in soup.find_all(["h2", "h3"]):
@@ -842,56 +956,85 @@ def parse_mob_drops(html_content: str, mob_name: str) -> List[Transformation]:
                 drops_section = heading
                 break
 
-    if not drops_section:
-        return transformations
+    if drops_section:
+        # Parse main drops table (if exists)
+        # Only search within the Drops section boundary (until next h2)
+        next_h2 = drops_section.find_next_sibling("h2")
+        table = None
+        current_elem = drops_section.find_next_sibling()
+        while current_elem:
+            if current_elem == next_h2:
+                break
+            if current_elem.name == "table" and "wikitable" in current_elem.get("class", []):
+                table = current_elem
+                break
+            current_elem = current_elem.find_next_sibling()
 
-    # Find table after drops section
-    table = drops_section.find_next("table", class_="wikitable")
-    if not table:
-        return transformations
+        if table:
+            _parse_drops_table(table)
 
-    if not is_java_edition(table):
-        return transformations
+        # Parse subsections under "Drops"
+        # Only parse tables in subsections, not lists or paragraphs
+        # Lists and paragraphs often contain navigation/behavior descriptions with false positives
+        subsections = find_subsections(drops_section)
+        for subsection_heading, _ in subsections:
+            # Extract ID from the nested span with class="mw-headline"
+            id_span = subsection_heading.find('span', class_='mw-headline')
+            subsection_id = id_span.get('id', '') if id_span else subsection_heading.get('id', '')
+            subsection_text = subsection_heading.get_text().lower()
 
-    # Create virtual mob item
-    mob_item = Item(name=mob_name, url=f"https://minecraft.wiki/w/{mob_name.replace(' ', '_')}")
+            # Skip experience-only subsections
+            if 'experience' in subsection_text and 'item' not in subsection_text:
+                continue
 
-    # Parse drop table
-    rows = table.find_all("tr")[1:]  # Skip header
+            # Expert rule for armadillo's "Brushing" subsection
+            # This subsection uses a simple list format instead of wikitable
+            if subsection_id == 'Brushing':
+                next_heading = subsection_heading.find_next_sibling(["h2", "h3"])
+                current_elem = subsection_heading.find_next_sibling()
+                while current_elem:
+                    if current_elem == next_heading:
+                        break
+                    # Look for unordered lists containing item links
+                    if current_elem.name == "ul":
+                        list_items = current_elem.find_all("li")
+                        for li in list_items:
+                            # Extract items from links within the list item
+                            links = li.find_all("a", href=re.compile(r"^/w/"))
+                            for link in links:
+                                item = extract_item_from_link(link)
+                                if item:
+                                    _add_transformation(item)
+                        break  # Only parse the first list in this subsection
+                    current_elem = current_elem.find_next_sibling()
+                continue  # Skip normal table parsing for Brushing subsection
 
-    for row in rows:
-        cells = row.find_all("td")
-        if len(cells) < 2:
-            continue
+            # Look for tables in the subsection
+            # We need to check if the table appears before the next heading
+            next_heading = subsection_heading.find_next_sibling(["h2", "h3"])
 
-        # First cell usually contains item
-        item_cell = cells[0]
-        links = item_cell.find_all("a", href=re.compile(r"^/w/"))
+            # Find all tables between this subsection and the next heading
+            current_elem = subsection_heading.find_next_sibling()
+            while current_elem:
+                if current_elem == next_heading:
+                    break
+                if current_elem.name == "table" and "wikitable" in current_elem.get("class", []):
+                    _parse_drops_table(current_elem)
+                    break  # Only parse the first table in this subsection
+                current_elem = current_elem.find_next_sibling()
 
-        for link in links:
-            item = extract_item_from_link(link)
-            if item:
-                # Try to extract probability if present
-                probability = 1.0
-                if len(cells) > 2:
-                    prob_text = cells[2].get_text(strip=True)
-                    if "%" in prob_text:
-                        try:
-                            probability = float(prob_text.replace("%", "")) / 100.0
-                        except ValueError:
-                            pass
-
-                transformation = Transformation(
-                    transformation_type=TransformationType.MOB_DROP,
-                    inputs=[mob_item],
-                    outputs=[item],
-                    metadata={"probability": probability},
-                )
-                # Only add if not seen before
-                sig = transformation.get_signature()
-                if sig not in seen_signatures:
-                    seen_signatures.add(sig)
-                    transformations.append(transformation)
+    # Parse special sections for behavioral drops
+    # Only parse the Gifts section (e.g., cats bringing items) and only from tables
+    # Avoid parsing Attacking/Behavior sections as they often describe game mechanics, not actual drops
+    gifts_section = soup.find(id="Gifts")
+    if gifts_section:
+        # If we found a span with id="Gifts", get its parent (the h2/h3 element)
+        if gifts_section.name == "span":
+            gifts_section = gifts_section.find_parent(["h2", "h3"])
+        if gifts_section:
+            gifts_table = gifts_section.find_next("table", class_="wikitable")
+            if gifts_table and is_java_edition(gifts_table):
+                _parse_drops_table(gifts_table)
 
     return transformations
 
@@ -1101,5 +1244,155 @@ def parse_grindstone(html_content: str) -> List[Transformation]:
                     outputs=[output_items[0]],  # Always use single output
                 )
             )
+
+    return transformations
+
+
+def parse_bartering(html_content: str) -> List[Transformation]:
+    """
+    Parse bartering data from HTML content.
+
+    Extracts Piglin bartering transformations where Gold Ingot is traded for various items.
+
+    Args:
+        html_content: HTML content from bartering wiki page
+
+    Returns:
+        List of Transformation objects for bartering trades
+    """
+    soup = BeautifulSoup(html_content, "lxml")
+    transformations: List[Transformation] = []
+    seen_signatures = set()
+
+    # Find the bartering items table
+    tables = soup.find_all("table", class_="wikitable")
+
+    for table in tables:
+        # Find the header row with "Item given"
+        header_row = None
+        for tr in table.find_all("tr"):
+            headers = [th.get_text(strip=True) for th in tr.find_all("th")]
+            if "Item given" in headers:
+                header_row = tr
+                break
+
+        if not header_row:
+            continue
+
+        # Get column index for "Item given"
+        headers = [th.get_text(strip=True) for th in header_row.find_all("th")]
+        item_given_idx = headers.index("Item given")
+
+        # Parse data rows
+        all_rows = table.find_all("tr")
+        header_idx = all_rows.index(header_row)
+        data_rows = all_rows[header_idx + 1:]
+
+        for row in data_rows:
+            cells = row.find_all(["th", "td"])
+
+            # Skip rows without an item_given cell
+            if len(cells) <= item_given_idx:
+                continue
+
+            item_given_cell = cells[item_given_idx]
+
+            # Extract items from the "Item given" cell
+            # Some cells have multiple items separated by line breaks (alternative items)
+            item_links = item_given_cell.find_all("a", href=re.compile(r"^/w/"))
+
+            for link in item_links:
+                # Filter out edition marker links (JE/BE links)
+                href = link.get('href', '')
+                if '/Java_Edition' in href or '/Bedrock_Edition' in href:
+                    continue
+
+                # Skip image-only links (they contain <img> tags and are duplicates of text links)
+                if link.find('img'):
+                    continue
+
+                # Skip enchantment links that appear after "with" text
+                # Example: <br />with <a href="/w/Soul_Speed">Soul Speed</a> (random level)
+                # We need to check if there's "with" text before this link
+                previous_text = ""
+                for prev_sibling in link.previous_siblings:
+                    if isinstance(prev_sibling, str):
+                        previous_text = prev_sibling + previous_text
+                    elif prev_sibling.name == 'br':
+                        # Found a <br>, check accumulated text
+                        if 'with' in previous_text.strip():
+                            break
+                        # Reset for next segment
+                        previous_text = ""
+                    else:
+                        # Reset on other tags (like <span>)
+                        previous_text = ""
+
+                # If we found "with" in the text immediately before this link, skip it
+                if 'with' in previous_text.strip():
+                    continue
+
+                # Check if this specific link has a BE only marker near it
+                # Get the parent span that wraps this link
+                # The structure is: <span class="nowrap">...<a>Item</a></span><sup>[JE/BE only]</sup><br/>
+                link_parent = link.find_parent()
+                if link_parent:
+                    # Get the next siblings after the parent span (up to <br/>)
+                    text_parts = []
+                    for sibling in link_parent.next_siblings:
+                        if sibling.name == 'br':
+                            break
+                        if isinstance(sibling, str):
+                            text_parts.append(sibling)
+                        else:
+                            # Get text from element (like <sup>)
+                            text_parts.append(sibling.get_text())
+
+                    # Check if the text after this link's parent contains [BE only] or "Bedrock Edition"
+                    text_after = ''.join(text_parts)
+                    if ('[BE' in text_after and 'only' in text_after) or 'Bedrock Edition' in text_after:
+                        continue
+
+                # Extract item directly (don't use extract_item_from_link because it checks
+                # ALL edition markers in the parent <td>, which would incorrectly filter out
+                # Spectral Arrow when it shares a cell with Arrow [BE only])
+                href = link.get('href', '')
+                if not href or not href.startswith('/w/'):
+                    continue
+
+                # Extract name from title or href
+                name = link.get('title', '')
+                if not name:
+                    name = href[3:].replace('_', ' ')
+
+                if not name:
+                    continue
+
+                url = f'https://minecraft.wiki{href}'
+                item = Item(name=name, url=url)
+
+                # Skip education edition items
+                if is_education_edition_item(item.name):
+                    continue
+
+                # Create Gold Ingot input
+                gold_ingot = Item(
+                    name="Gold Ingot",
+                    url="https://minecraft.wiki/w/Gold_Ingot"
+                )
+
+                # Create transformation (no quantity, no probability - just the item)
+                transformation = Transformation(
+                    transformation_type=TransformationType.BARTERING,
+                    inputs=[gold_ingot],
+                    outputs=[item],
+                    metadata={},
+                )
+
+                # Deduplicate using signature
+                signature = transformation.get_signature()
+                if signature not in seen_signatures:
+                    seen_signatures.add(signature)
+                    transformations.append(transformation)
 
     return transformations

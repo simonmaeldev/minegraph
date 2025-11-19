@@ -578,6 +578,147 @@ class TestParsers:
 
         assert isinstance(result, list)
 
+    def test_parse_mob_drops_from_main_table(self):
+        """Test parsing mob drops from main drops table."""
+        from src.core.parsers import parse_mob_drops
+
+        html = '''
+        <html><body>
+        <h2><span class="mw-headline" id="Drops">Drops</span></h2>
+        <table class="wikitable">
+            <tr><th>Item</th><th>Amount</th><th>Chance</th></tr>
+            <tr>
+                <td><a href="/w/Rotten_Flesh" title="Rotten Flesh">Rotten Flesh</a></td>
+                <td>0-2</td>
+                <td>100%</td>
+            </tr>
+        </table>
+        </body></html>
+        '''
+
+        result = parse_mob_drops(html, "Zombie")
+
+        assert len(result) == 1
+        assert result[0].outputs[0].name == "Rotten Flesh"
+        assert result[0].inputs[0].name == "Zombie"
+
+    def test_parse_mob_drops_from_subsection_with_table(self):
+        """Test parsing mob drops from subsection with table."""
+        from src.core.parsers import parse_mob_drops
+
+        html = '''
+        <html><body>
+        <h2><span class="mw-headline" id="Drops">Drops</span></h2>
+        <h3><span class="mw-headline" id="On_death">On death</span></h3>
+        <table class="wikitable">
+            <tr><th>Item</th></tr>
+            <tr><td><a href="/w/Golden_Axe" title="Golden Axe">Golden Axe</a></td></tr>
+            <tr><td><a href="/w/Gold_Ingot" title="Gold Ingot">Gold Ingot</a></td></tr>
+        </table>
+        </body></html>
+        '''
+
+        result = parse_mob_drops(html, "Piglin Brute")
+
+        assert len(result) == 2
+        item_names = {t.outputs[0].name for t in result}
+        assert "Golden Axe" in item_names
+        assert "Gold Ingot" in item_names
+
+    def test_parse_mob_drops_from_gifts_section(self):
+        """Test parsing mob drops from Gifts section (e.g., cat gifts)."""
+        from src.core.parsers import parse_mob_drops
+
+        html = '''
+        <html><body>
+        <h2><span class="mw-headline" id="Drops">Drops</span></h2>
+        <table class="wikitable">
+            <tr><th>Item</th></tr>
+            <tr><td><a href="/w/String" title="String">String</a></td></tr>
+        </table>
+        <h3><span class="mw-headline" id="Gifts">Gifts</span></h3>
+        <table class="wikitable">
+            <tr><th>Item</th><th>Chance</th></tr>
+            <tr><td><a href="/w/Rabbit%27s_Foot" title="Rabbit's Foot">Rabbit's Foot</a></td><td>16.13%</td></tr>
+            <tr><td><a href="/w/Feather" title="Feather">Feather</a></td><td>16.13%</td></tr>
+        </table>
+        </body></html>
+        '''
+
+        result = parse_mob_drops(html, "Cat")
+
+        assert len(result) >= 3
+        item_names = {t.outputs[0].name for t in result}
+        assert "String" in item_names
+        assert "Rabbit's Foot" in item_names
+        assert "Feather" in item_names
+
+    def test_parse_mob_drops_ignores_experience(self):
+        """Test that experience orbs are not treated as items."""
+        from src.core.parsers import parse_mob_drops
+
+        html = '''
+        <html><body>
+        <h2><span class="mw-headline" id="Drops">Drops</span></h2>
+        <table class="wikitable">
+            <tr><th>Item</th></tr>
+            <tr><td><a href="/w/Experience" title="Experience">Experience</a></td></tr>
+            <tr><td><a href="/w/String" title="String">String</a></td></tr>
+        </table>
+        </body></html>
+        '''
+
+        result = parse_mob_drops(html, "Spider")
+
+        # Should only have String, not Experience
+        assert len(result) == 1
+        assert result[0].outputs[0].name == "String"
+
+    def test_parse_mob_drops_deduplicates(self):
+        """Test that same item from multiple sections is deduplicated."""
+        from src.core.parsers import parse_mob_drops
+
+        html = '''
+        <html><body>
+        <h2><span class="mw-headline" id="Drops">Drops</span></h2>
+        <table class="wikitable">
+            <tr><th>Item</th></tr>
+            <tr><td><a href="/w/String" title="String">String</a></td></tr>
+        </table>
+        <h3><span class="mw-headline" id="On_death">On death</span></h3>
+        <p>Also drops <a href="/w/String" title="String">String</a>.</p>
+        </body></html>
+        '''
+
+        result = parse_mob_drops(html, "Spider")
+
+        # Should only have one String transformation
+        assert len(result) == 1
+        assert result[0].outputs[0].name == "String"
+
+    def test_parse_mob_drops_tadpole_zero_drops(self):
+        """Test that tadpole correctly returns 0 drops (not biomes from Behavior section)."""
+        from src.core.parsers import parse_mob_drops
+
+        html = '''
+        <html><body>
+        <h2><span class="mw-headline" id="Drops">Drops</span></h2>
+        <p>As with other baby animals, tadpoles do not drop any items or experience on death.</p>
+        <h2><span class="mw-headline" id="Behavior">Behavior</span></h2>
+        <table class="wikitable">
+            <tr><th>Biome</th><th>Frog Variant</th></tr>
+            <tr><td><a href="/w/River" title="River">River</a></td><td>Temperate</td></tr>
+            <tr><td><a href="/w/Beach" title="Beach">Beach</a></td><td>Temperate</td></tr>
+            <tr><td><a href="/w/Taiga" title="Taiga">Taiga</a></td><td>Cold</td></tr>
+        </table>
+        </body></html>
+        '''
+
+        result = parse_mob_drops(html, "Tadpole")
+
+        # Should have 0 drops (biome links should not be extracted)
+        assert len(result) == 0
+
     def test_filter_bedrock_education_recipes(self):
         """Test that parse_crafting filters out Bedrock/Education recipes like Bleach."""
         from src.core.parsers import parse_crafting
@@ -1364,3 +1505,288 @@ class TestParseComposting:
 
         assert len(result) == 1
         assert result[0].transformation_type == TransformationType.COMPOSTING
+
+
+class TestParseBartering:
+    """Tests for parse_bartering function."""
+
+    def test_parse_bartering_basic(self):
+        """Test parsing basic bartering table."""
+        from src.core.parsers import parse_bartering
+
+        empty_html = "<html><body></body></html>"
+        result = parse_bartering(empty_html)
+
+        assert isinstance(result, list)
+
+    def test_parse_bartering_extracts_items(self):
+        """Test that bartering parser extracts items correctly."""
+        from src.core.parsers import parse_bartering
+        from src.core.data_models import TransformationType
+
+        html = '''
+        <html><body>
+        <table class="wikitable sortable">
+            <caption>Bartering items</caption>
+            <tbody>
+                <tr>
+                    <th>Item given</th>
+                    <th>Quantity</th>
+                    <th>Chance</th>
+                    <th>Ingots needed</th>
+                </tr>
+                <tr>
+                    <td>
+                        <span class="nowrap">
+                            <a href="/w/Ender_Pearl" title="Ender Pearl">
+                                <span class="sprite-text">Ender Pearl</span>
+                            </a>
+                        </span>
+                    </td>
+                    <td>2-4</td>
+                    <td>5⁄469<br />(~1.07%)</td>
+                    <td>93.8</td>
+                </tr>
+                <tr>
+                    <td>
+                        <span class="nowrap">
+                            <a href="/w/Fire_Charge" title="Fire Charge">
+                                <span class="sprite-text">Fire Charge</span>
+                            </a>
+                        </span>
+                    </td>
+                    <td>1</td>
+                    <td>10⁄469<br />(~2.13%)</td>
+                    <td>46.9</td>
+                </tr>
+            </tbody>
+        </table>
+        </body></html>
+        '''
+
+        result = parse_bartering(html)
+
+        assert len(result) == 2
+        assert result[0].transformation_type == TransformationType.BARTERING
+        assert result[1].transformation_type == TransformationType.BARTERING
+
+        # Check that outputs are Ender Pearl and Fire Charge
+        output_names = {t.outputs[0].name for t in result}
+        assert "Ender Pearl" in output_names
+        assert "Fire Charge" in output_names
+
+    def test_parse_bartering_gold_ingot_input(self):
+        """Test that all bartering transformations have Gold Ingot as input."""
+        from src.core.parsers import parse_bartering
+
+        html = '''
+        <html><body>
+        <table class="wikitable sortable">
+            <tbody>
+                <tr>
+                    <th>Item given</th>
+                    <th>Quantity</th>
+                    <th>Chance</th>
+                    <th>Ingots needed</th>
+                </tr>
+                <tr>
+                    <td>
+                        <a href="/w/Obsidian" title="Obsidian">Obsidian</a>
+                    </td>
+                    <td>1</td>
+                    <td>10⁄469<br />(~2.13%)</td>
+                    <td>46.9</td>
+                </tr>
+            </tbody>
+        </table>
+        </body></html>
+        '''
+
+        result = parse_bartering(html)
+
+        assert len(result) == 1
+        assert len(result[0].inputs) == 1
+        assert result[0].inputs[0].name == "Gold Ingot"
+        assert result[0].outputs[0].name == "Obsidian"
+
+    def test_parse_bartering_filters_bedrock_items(self):
+        """Test that Bedrock Edition items are filtered out."""
+        from src.core.parsers import parse_bartering
+
+        html = '''
+        <html><body>
+        <table class="wikitable sortable">
+            <tbody>
+                <tr>
+                    <th>Item given</th>
+                    <th>Quantity</th>
+                    <th>Chance</th>
+                    <th>Ingots needed</th>
+                </tr>
+                <tr>
+                    <td>
+                        <span class="nowrap">
+                            <a href="/w/Spectral_Arrow" title="Spectral Arrow">Spectral Arrow</a>
+                        </span>
+                        [JE only]<br />
+                        <span class="nowrap">
+                            <a href="/w/Arrow" title="Arrow">Arrow</a>
+                        </span>
+                        [BE only]
+                    </td>
+                    <td>6-12</td>
+                    <td>10⁄469<br />(~2.13%)</td>
+                    <td>46.9</td>
+                </tr>
+            </tbody>
+        </table>
+        </body></html>
+        '''
+
+        result = parse_bartering(html)
+
+        # Should only have Spectral Arrow (Java Edition), not Arrow (Bedrock Edition)
+        output_names = [t.outputs[0].name for t in result]
+        assert "Spectral Arrow" in output_names
+        assert "Arrow" not in output_names
+
+    def test_parse_bartering_empty_table(self):
+        """Test handling of empty or missing table."""
+        from src.core.parsers import parse_bartering
+
+        html = '''
+        <html><body>
+        <table class="wikitable">
+            <tbody>
+                <tr>
+                    <th>Wrong Header</th>
+                </tr>
+            </tbody>
+        </table>
+        </body></html>
+        '''
+
+        result = parse_bartering(html)
+
+        assert isinstance(result, list)
+        assert len(result) == 0
+
+    def test_parse_bartering_deduplication(self):
+        """Test that duplicate transformations are deduplicated."""
+        from src.core.parsers import parse_bartering
+
+        # Create HTML with duplicate items
+        html = '''
+        <html><body>
+        <table class="wikitable sortable">
+            <tbody>
+                <tr>
+                    <th>Item given</th>
+                    <th>Quantity</th>
+                    <th>Chance</th>
+                    <th>Ingots needed</th>
+                </tr>
+                <tr>
+                    <td>
+                        <a href="/w/Gravel" title="Gravel">Gravel</a>
+                    </td>
+                    <td>8-16</td>
+                    <td>20⁄469<br />(~4.27%)</td>
+                    <td>23.45</td>
+                </tr>
+                <tr>
+                    <td>
+                        <a href="/w/Gravel" title="Gravel">Gravel</a>
+                    </td>
+                    <td>8-16</td>
+                    <td>20⁄469<br />(~4.27%)</td>
+                    <td>23.45</td>
+                </tr>
+            </tbody>
+        </table>
+        </body></html>
+        '''
+
+        result = parse_bartering(html)
+
+        # Should deduplicate to single transformation
+        assert len(result) == 1
+        assert result[0].outputs[0].name == "Gravel"
+
+    def test_parse_bartering_excludes_enchantments(self):
+        """Test that enchantment links after 'with' text are not extracted as items."""
+        from src.core.parsers import parse_bartering
+        from src.core.data_models import TransformationType
+
+        html = '''
+        <html><body>
+        <table class="wikitable sortable">
+            <caption>Bartering items</caption>
+            <tbody>
+                <tr>
+                    <th>Item given</th>
+                    <th>Quantity</th>
+                    <th>Chance</th>
+                    <th>Ingots needed</th>
+                </tr>
+                <tr>
+                    <td>
+                        <span class="nowrap">
+                            <a href="/w/Enchanted_Book" title="Enchanted Book">Enchanted Book</a>
+                        </span>
+                        <br />with <a href="/w/Soul_Speed" title="Soul Speed">Soul Speed</a> (random level)
+                    </td>
+                    <td>1</td>
+                    <td>5⁄469<br />(~1.07%)</td>
+                    <td>93.8</td>
+                </tr>
+                <tr>
+                    <td>
+                        <span class="nowrap">
+                            <a href="/w/Iron_Boots" title="Iron Boots">Iron Boots</a>
+                        </span>
+                        <br />with <a href="/w/Soul_Speed" title="Soul Speed">Soul Speed</a> (random level)
+                    </td>
+                    <td>1</td>
+                    <td>8⁄469<br />(~1.71%)</td>
+                    <td>58.6</td>
+                </tr>
+            </tbody>
+        </table>
+        </body></html>
+        '''
+
+        result = parse_bartering(html)
+
+        # Should extract exactly 2 items (Enchanted Book and Iron Boots)
+        # Should NOT extract Soul Speed (it's an enchantment, not an item)
+        assert len(result) == 2
+
+        output_names = [t.outputs[0].name for t in result]
+        assert "Enchanted Book" in output_names
+        assert "Iron Boots" in output_names
+        assert "Soul Speed" not in output_names
+
+        # Verify all transformations have Gold Ingot as input
+        for transformation in result:
+            assert transformation.transformation_type == TransformationType.BARTERING
+            assert len(transformation.inputs) == 1
+            assert transformation.inputs[0].name == "Gold Ingot"
+            assert len(transformation.outputs) == 1
+
+    def test_parse_mob_drops_armadillo(self):
+        """Test parsing armadillo mob drops from Brushing subsection."""
+        from src.core.parsers import parse_mob_drops
+        from src.core.data_models import TransformationType
+        from pathlib import Path
+
+        # Load actual armadillo HTML file
+        html = Path('ai_doc/downloaded_pages/mobs/armadillo.html').read_text()
+
+        result = parse_mob_drops(html, "Armadillo")
+
+        # Should extract exactly 1 transformation: Armadillo -> Armadillo Scute
+        assert len(result) == 1
+        assert result[0].transformation_type == TransformationType.MOB_DROP
+        assert result[0].inputs[0].name == "Armadillo"
+        assert result[0].outputs[0].name == "Armadillo Scute"
