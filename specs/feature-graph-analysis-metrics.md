@@ -9,7 +9,7 @@ I want to compute various graph metrics on the Minecraft transformation network
 So that I can understand structural properties like connectivity, centrality, and density without needing to visualize the entire graph
 
 ## Problem Statement
-Currently, the project provides excellent visualization capabilities (`visualize_graph_3d.py`, `visualize_graph_with_graphviz.py`), but lacks a dedicated script for computing and reporting graph metrics. Users interested in quantitative analysis must either:
+Currently, the project provides excellent visualization capabilities (`visualize_graph_3d.py`), but lacks a dedicated script for computing and reporting graph metrics. Users interested in quantitative analysis must either:
 - Build the graph manually and compute metrics themselves
 - Run visualization scripts just to get basic statistics
 - Write one-off analysis code that's hard to reuse

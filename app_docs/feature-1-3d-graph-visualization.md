@@ -6,7 +6,7 @@
 
 ## Overview
 
-This feature adds interactive 3D visualization of Minecraft transformation networks using NetworkX and Matplotlib. Unlike the existing 2D Graphviz visualization, the 3D view allows users to rotate, zoom, and pan around the graph in 3D space, providing better spatial separation for large, interconnected graphs with 1961+ transformations.
+This feature adds interactive 3D visualization of Minecraft transformation networks using NetworkX and Matplotlib. The 3D view allows users to rotate, zoom, and pan around the graph in 3D space, providing better spatial separation for large, interconnected graphs with 1961+ transformations.
 
 ## What Was Built
 
@@ -14,8 +14,7 @@ The implementation includes:
 - **New 3D Visualization Script** (`src/visualize_graph_3d.py`) - Main script that reads CSV data, builds NetworkX graph, and generates interactive 3D visualization
 - **Comprehensive Test Suite** (`tests/test_visualize_graph_3d.py`) - Full unit and integration tests for all 3D visualization components
 - **NetworkX Dependency** - Added networkx[default]>=3.5 to pyproject.toml for graph construction and layout algorithms
-- **Enhanced Documentation** - Updated README.md with detailed comparison between 2D and 3D visualization options
-- **File Rename** - Renamed `src/visualize_graph.py` to `src/visualize_graph_with_graphviz.py` for clarity
+- **Enhanced Documentation** - Updated README.md with visualization options
 
 ## Technical Implementation
 
@@ -24,16 +23,14 @@ The implementation includes:
 - `src/visualize_graph_3d.py` (new): Complete 3D visualization implementation with NetworkX graph construction, spectral layout positioning, and Matplotlib 3D rendering
 - `tests/test_visualize_graph_3d.py` (new): Comprehensive test coverage for CSV loading, graph building, layout computation, node sizing, edge coloring, and end-to-end integration
 - `pyproject.toml`: Added networkx[default]>=3.5 dependency
-- `README.md`: Added extensive 3D visualization documentation including usage examples, command-line options, feature descriptions, and comparison table between 2D and 3D approaches
-- `src/visualize_graph_with_graphviz.py` (renamed from `src/visualize_graph.py`): Made naming more explicit
-- `tests/test_visualize_graph.py`: Updated import path after rename
+- `README.md`: Added extensive 3D visualization documentation including usage examples, command-line options, and feature descriptions
 
 ### Key Changes
 
 **Graph Construction:**
 - Uses NetworkX DiGraph to model transformation network
 - Single-input transformations create direct edges between items
-- Multi-input transformations use intermediate nodes (consistent with Graphviz approach)
+- Multi-input transformations use intermediate nodes
 - Reuses existing `config/graph_colors.txt` for edge coloring by transformation type
 
 **3D Layout Algorithm:**

@@ -33,16 +33,6 @@ This prompt helps you determine what documentation you should read based on the 
     - When adding category metadata to other transformation types
     - When modifying the parse_crafting() function or category extraction logic
 
-- app_docs/feature-0-graphviz-visualization.md
-  - Conditions:
-    - When working with graph visualization or Graphviz integration
-    - When implementing or modifying visual representations of transformations
-    - When adding new output formats or rendering options
-    - When troubleshooting graph generation or layout issues
-    - When customizing colors, styles, or graph appearance
-    - When implementing filtering for graph visualization
-    - When handling multi-input transformations in visualizations
-
 - app_docs/feature-1-3d-graph-visualization.md
   - Conditions:
     - When working with 3D graph visualization or NetworkX integration

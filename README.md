@@ -48,15 +48,8 @@ This project uses [uv](https://github.com/astral-sh/uv) for dependency managemen
    - lxml
    - requests
    - pytest
-   - graphviz (Python package)
    - networkx (for 3D visualization)
    - matplotlib (for 3D visualization)
-
-4. **Install Graphviz system dependency** (optional, only required for 2D visualization):
-   - **macOS**: `brew install graphviz`
-   - **Ubuntu/Debian**: `sudo apt-get install graphviz`
-   - **Windows**: Download from https://graphviz.org/download/
-   - **Note**: The 3D visualization (NetworkX + Matplotlib) does not require Graphviz to be installed
 
 ## Usage
 
@@ -141,41 +134,9 @@ uv run python src/download_item_images.py --help
 
 ### Visualize Transformation Graph
 
-Minegraph provides three visualization options: **static 2D graphs** (Graphviz), **interactive 3D graphs** (NetworkX + Matplotlib), and **interactive web-based graphs** (Cosmograph).
+Minegraph provides two visualization options: **interactive 3D graphs** (NetworkX + Matplotlib) and **interactive web-based graphs** (Cosmograph).
 
-#### Option 1: 2D Graph Visualization (Graphviz)
-
-Generate static 2D visual representations using Graphviz:
-
-```bash
-# Generate default SVG graph from all transformations
-uv run python src/visualize_graph_with_graphviz.py
-
-# Generate graph in PNG format
-uv run python src/visualize_graph_with_graphviz.py -f png
-
-# Generate graph with custom output path
-uv run python src/visualize_graph_with_graphviz.py -o output/graphs/my_graph
-
-# Filter by transformation type (e.g., only crafting)
-uv run python src/visualize_graph_with_graphviz.py -t crafting -o output/graphs/crafting_only
-
-# Generate multiple formats at once
-uv run python src/visualize_graph_with_graphviz.py -f png,svg,pdf
-
-# Show help for all options
-uv run python src/visualize_graph_with_graphviz.py --help
-```
-
-**Command-line Options:**
-- `-i, --input`: Path to transformations CSV (default: `output/transformations.csv`)
-- `-c, --config`: Path to color config (default: `config/graph_colors.txt`)
-- `-o, --output`: Output file path without extension (default: `output/graphs/transformation_graph`)
-- `-f, --format`: Output format(s) - comma-separated: svg, png, pdf, dot (default: svg)
-- `-t, --filter-type`: Filter to only include specific transformation type
-- `-v, --verbose`: Enable verbose logging
-
-#### Option 2: Interactive 3D Visualization (NetworkX + Matplotlib)
+#### Option 1: Interactive 3D Visualization (NetworkX + Matplotlib)
 
 Generate an interactive 3D visualization that you can rotate, zoom, and pan:
 
@@ -241,9 +202,9 @@ To bypass interactive mode, either:
 - **Fallback Rendering**: Items without images automatically fall back to colored spheres
 - **Edge Coloring**: Edges colored by transformation type using the same color configuration as 2D graphs
 - **Intermediate Nodes**: Multi-input transformations use small gray intermediate nodes
-- **No System Dependencies**: Uses NetworkX and Matplotlib (already included), no need to install Graphviz
+- **No System Dependencies**: Uses NetworkX and Matplotlib (already included)
 
-#### Option 3: Interactive Web-Based Visualization (Cosmograph)
+#### Option 2: Interactive Web-Based Visualization (Cosmograph)
 
 Generate GPU-accelerated interactive graph visualizations in Jupyter notebooks:
 
@@ -283,23 +244,23 @@ The notebook includes examples for:
 - Customizing colors and layout
 - Exporting to HTML
 
-**Comparison: 2D vs 3D vs Web Visualization**
+**Comparison: 3D vs Web Visualization**
 
-| Aspect | 2D (Graphviz) | 3D (NetworkX + Matplotlib) | Web (Cosmograph) |
-|--------|---------------|----------------------------|------------------|
-| Layout | Hierarchical, static | Spring (force-directed), spatial | Force-directed, dynamic |
-| Interactivity | None (static images) | Full rotation, zoom, pan | Zoom, pan, hover, drag |
-| Performance | Fast for large graphs | Slower layout computation | GPU-accelerated, very smooth |
-| Output | SVG, PNG, PDF files | Interactive window + optional save | Interactive notebook widget + HTML export |
-| Environment | Command-line script | Command-line script | Jupyter notebook |
-| Dependencies | System graphviz + Python package | NetworkX + Matplotlib | Pure Python (cosmograph) |
-| Best for | Detailed static analysis, print | 3D exploration | Web-based exploration, sharing |
-| Filtering | By transformation type (`-t` flag) | By transformation type (`--filter-type` flag) | Programmatic filtering in notebook |
-| Option Selection | Command-line only | Interactive fzf menu or command-line | Jupyter cells |
+| Aspect | 3D (NetworkX + Matplotlib) | Web (Cosmograph) |
+|--------|----------------------------|------------------|
+| Layout | Spring (force-directed), spatial | Force-directed, dynamic |
+| Interactivity | Full rotation, zoom, pan | Zoom, pan, hover, drag |
+| Performance | Slower layout computation | GPU-accelerated, very smooth |
+| Output | Interactive window + optional save | Interactive notebook widget + HTML export |
+| Environment | Command-line script | Jupyter notebook |
+| Dependencies | NetworkX + Matplotlib | Pure Python (cosmograph) |
+| Best for | 3D exploration | Web-based exploration, sharing |
+| Filtering | By transformation type (`--filter-type` flag) | Programmatic filtering in notebook |
+| Option Selection | Interactive fzf menu or command-line | Jupyter cells |
 
 **Customizing Colors:**
 
-Edit `config/graph_colors.txt` to customize the colors for different transformation types (applies to all visualizations: 2D, 3D, and Cosmograph):
+Edit `config/graph_colors.txt` to customize the colors for different transformation types (applies to both 3D and Cosmograph visualizations):
 
 ```
 # Example configuration
@@ -314,12 +275,10 @@ Colors can be hex codes (e.g., `#4A90E2`) or standard color names (e.g., `blue`)
 **Performance Note:**
 
 With 2200+ transformations, the full graph is very large and complex:
-- **2D Graphviz**: Use the `-t` flag to filter by transformation type for better readability
 - **3D Visualization**: Use the `--filter-type` flag to focus on specific transformation types
 - **Cosmograph**: GPU-accelerated, handles the full graph smoothly without filtering
-- Layout computation may take 5-30 seconds for full graph in 2D/3D; filtering significantly improves performance
+- Layout computation may take 5-30 seconds for full graph in 3D; filtering significantly improves performance
 - Interactive rotation remains smooth even with large graphs
-- View SVG files in a browser for pan/zoom capabilities
 - Cosmograph provides the best performance for exploring the complete graph interactively
 
 ## Output Format

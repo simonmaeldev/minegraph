@@ -212,7 +212,6 @@ uv run python src/visualize_graph_3d.py -i output/transformations.csv -v
 - This is a new feature requested by the user alongside fzf integration
 - Filtering happens at CSV load time before graph construction
 - Reduces graph complexity when user wants to focus on specific transformation types
-- Mirrors the `--filter-type` functionality from `visualize_graph_with_graphviz.py`
 
 ### Future Enhancements
 - Remember user's last selections in a config file for quicker re-runs
