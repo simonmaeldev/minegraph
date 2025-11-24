@@ -1,0 +1,5 @@
+transformation_type,input_items,output_items,metadata
+crafting,"[""Oak Planks""]","[""Stick""]",{}
+smelting,"[""Iron Ore""]","[""Iron Ingot""]",{}
+crafting,"[""Iron Ingot"", ""Stick""]","[""Iron Sword""]",{}
+crafting,"[""Oak Planks"", ""Stick""]","[""Wooden Pickaxe""]",{}

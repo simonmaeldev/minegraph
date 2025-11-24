@@ -1,0 +1,4 @@
+# Test color configuration
+crafting=#4A90E2
+smelting=#E67E22
+custom_type=#ABCDEF

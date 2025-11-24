@@ -88,3 +88,28 @@ This prompt helps you determine what documentation you should read based on the 
     - When implementing checkbox or multi-select menus in terminal interfaces
     - When adding filtering capabilities to graph visualizations
 
+- app_docs/bug-remove-intermediate-nodes.md
+  - Conditions:
+    - When working with graph analysis or computing graph metrics
+    - When implementing or modifying AnalysisGraphBuilder or build_analysis_graph_from_csv()
+    - When troubleshooting discrepancies between visualization and analysis graphs
+    - When working with multi-input transformations and edge construction
+    - When implementing edge deduplication or direct edge creation
+    - When computing graph metrics (degree, density, centrality, connected components)
+    - When understanding the difference between Graph3DBuilder and AnalysisGraphBuilder
+    - When modifying src/analyze_graph.py or tests/test_analyze_graph.py
+    - When debugging why node counts or edge counts differ between visualization and analysis
+
+- app_docs/feature-graph-analysis-metrics.md
+  - Conditions:
+    - When working with graph analysis metrics or quantitative network analysis
+    - When adding new metric computation functions to analyze_graph.py
+    - When computing degree centrality, connectivity, or density metrics
+    - When using NetworkX algorithms for graph analysis
+    - When implementing CLI options for metric selection or filtering
+    - When understanding how to use the comment/uncomment pattern for metric selection
+    - When troubleshooting metric accuracy or graph loading issues
+    - When interpreting analysis output (in-degree, out-degree, components, density)
+    - When comparing analysis results across different transformation types
+    - When extending the analysis framework with custom metrics
+
