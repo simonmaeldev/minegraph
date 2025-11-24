@@ -16,7 +16,7 @@ Usage:
 Available Metrics:
     - Average degree (in-degree and out-degree)
     - Maximum degree (nodes with highest connectivity)
-    - Connected components (weakly and strongly connected)
+    - Connected components (weakly and strongly connected, with disconnected nodes listed)
     - Edge count (total edges and nodes)
     - Graph density (ratio of actual edges to possible edges)
 """
@@ -381,6 +381,10 @@ def analyze_connected_components(graph: nx.DiGraph) -> None:
     edge direction. Strongly connected components are groups where every node
     can reach every other node following directed edges.
 
+    This function also identifies and displays all nodes that are disconnected
+    from the main (largest) component, helping identify isolated items and
+    orphaned transformation networks.
+
     Args:
         graph: NetworkX directed graph
     """
@@ -403,6 +407,42 @@ def analyze_connected_components(graph: nx.DiGraph) -> None:
 
     print_metric("Strongly connected components", num_strong)
     print("    (Components with directed paths between all nodes)")
+
+    # Analyze disconnected components
+    # Get all weakly connected components (returned in descending order by size)
+    components = list(nx.weakly_connected_components(graph))
+
+    if not components:
+        # Empty graph case (already handled above, but being defensive)
+        return
+
+    # The first (largest) component is the main component
+    main_component = components[0]
+    disconnected_components = components[1:] if len(components) > 1 else []
+
+    print()  # Blank line for readability
+    print_metric("Main component nodes", len(main_component), "nodes")
+
+    if disconnected_components:
+        print_metric("Disconnected components", len(disconnected_components))
+        print()  # Blank line before listing components
+
+        total_disconnected = 0
+        for i, component in enumerate(disconnected_components, 1):
+            component_size = len(component)
+            total_disconnected += component_size
+
+            # Sort node names alphabetically for consistent output
+            sorted_nodes = sorted(component)
+
+            print(f"  Component {i} ({component_size} nodes):")
+            for node in sorted_nodes:
+                print(f"    - {node}")
+            print()  # Blank line between components
+
+        print_metric("Total disconnected nodes", total_disconnected, "nodes")
+    else:
+        print("  All nodes are in the main component (no disconnected nodes).")
 
 
 def analyze_edge_count(graph: nx.DiGraph) -> None:

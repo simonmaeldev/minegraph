@@ -291,6 +291,16 @@ def test_connected_components_disconnected(disconnected_graph, capsys):
     assert "Weakly connected components: 2" in captured.out
     # Each component has 2 nodes, but they're chains, so 4 SCCs total
     assert "Strongly connected components: 4" in captured.out
+    # Verify new output includes main component size
+    assert "Main component nodes:" in captured.out
+    # Verify disconnected components are reported
+    assert "Disconnected components: 1" in captured.out
+    # Verify specific node names are listed
+    output = captured.out
+    # One component should have A->B (2 nodes), the other C->D (2 nodes)
+    # The larger one (or first alphabetically if tied) becomes main
+    assert ("- A" in output or "- C" in output)
+    assert ("- B" in output or "- D" in output)
 
 
 def test_connected_components_cyclic(cyclic_graph, capsys):
@@ -300,6 +310,44 @@ def test_connected_components_cyclic(cyclic_graph, capsys):
     assert "Weakly connected components: 1" in captured.out
     # All 3 nodes form one strongly connected component (cycle)
     assert "Strongly connected components: 1" in captured.out
+
+
+def test_connected_components_lists_disconnected_nodes(disconnected_graph, capsys):
+    """Test that disconnected node names are listed and grouped by component."""
+    analyze_connected_components(disconnected_graph)
+    captured = capsys.readouterr()
+    output = captured.out
+
+    # Verify nodes are grouped by component
+    assert "Component 1" in output
+
+    # Verify all nodes from the disconnected component appear
+    # The disconnected component will be whichever is smaller (or second if equal)
+    # Since both components have 2 nodes, verify the pattern
+    node_count = output.count("- A") + output.count("- B") + output.count("- C") + output.count("- D")
+    # Should list nodes from the disconnected component (2 nodes)
+    assert node_count >= 2
+
+    # Verify nodes are sorted alphabetically
+    # Check that if both A and B appear together, A comes before B
+    if "- A" in output and "- B" in output:
+        assert output.index("- A") < output.index("- B")
+    if "- C" in output and "- D" in output:
+        assert output.index("- C") < output.index("- D")
+
+
+def test_connected_components_all_connected(simple_chain_graph, capsys):
+    """Test that all-connected graph shows no disconnected nodes."""
+    analyze_connected_components(simple_chain_graph)
+    captured = capsys.readouterr()
+    output = captured.out
+
+    # Verify it indicates all nodes are connected
+    assert "All nodes are in the main component" in output
+    # Verify no disconnected component listing
+    assert "Component 1" not in output
+    # Verify main component size equals total nodes (3)
+    assert "Main component nodes: 3" in output
 
 
 # ============================================================
