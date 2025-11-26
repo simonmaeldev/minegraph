@@ -109,6 +109,18 @@ def extract_all_transformations(data_dir: str = "ai_doc/downloaded_pages") -> Li
                 logger.warning("    5. Save it to ai_doc/downloaded_pages/crafting.html")
                 logger.warning("")
 
+    # Parse wandering trader trades from the wandering trader mob page
+    wandering_trader_path = os.path.join(data_dir, "mobs", "wandering_trader.html")
+    if os.path.exists(wandering_trader_path):
+        logger.info("Parsing wandering trader trades...")
+        try:
+            html_content = load_html_file(wandering_trader_path)
+            results = parse_trading(html_content)
+            transformations.extend(results)
+            logger.info(f"  Found {len(results)} wandering trader trades")
+        except Exception as e:
+            logger.error(f"  Error parsing wandering trader trades: {e}")
+
     # Parse mob drop pages
     mob_dir = os.path.join(data_dir, "mobs")
     if os.path.exists(mob_dir):

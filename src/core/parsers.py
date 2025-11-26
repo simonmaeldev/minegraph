@@ -904,11 +904,19 @@ def parse_trading(html_content: str) -> List[Transformation]:
         villager_header = table.find("th", attrs={"data-description": True})
         villager_type = villager_header.get("data-description", "Unknown") if villager_header else "Unknown"
 
-        # Find the header row that contains "Item wanted" and "Item given"
+        # Find the header row that contains trading column headers
+        # Different pages use different header names:
+        # - Regular villagers: "Item wanted" and "Item given"
+        # - Wandering trader: "Villager wants" and "Player receives"
         header_row = None
         for tr in table.find_all("tr"):
             headers = [th.get_text(strip=True) for th in tr.find_all("th")]
+            # Check for regular villager headers
             if "Item wanted" in headers and "Item given" in headers:
+                header_row = tr
+                break
+            # Check for wandering trader headers
+            if "Villager wants" in headers and "Player receives" in headers:
                 header_row = tr
                 break
 

@@ -569,6 +569,97 @@ class TestParsers:
             assert trade.inputs[0].name == "Emerald"
             assert trade.metadata["villager_type"] == "Armorer"
 
+    def test_parse_wandering_trader_trades(self):
+        """Test parsing wandering trader trades including Packed Ice, Blue Ice, and Nautilus Shell."""
+        from src.core.parsers import parse_trading
+        from src.core.data_models import TransformationType
+
+        html = '''
+        <table class="wikitable" style="text-align:center">
+            <tbody>
+                <tr>
+                    <th colspan="9" data-description="Wandering Trader">
+                        <span class="nowrap">
+                            <a href="/w/Wandering_Trader" title="Wandering Trader">
+                                <span class="sprite-text">Wandering Trader</span>
+                            </a>
+                        </span>
+                    </th>
+                </tr>
+                <tr>
+                    <th rowspan="2">Level</th>
+                    <th><i><a href="/w/Java_Edition" title="Java Edition">Java Edition</a></i></th>
+                    <th rowspan="2">Villager wants</th>
+                    <th rowspan="2">Player receives</th>
+                    <th rowspan="2">Trades in stock</th>
+                </tr>
+                <tr>
+                    <th>Probability</th>
+                </tr>
+                <tr>
+                    <th rowspan="3">Special</th>
+                    <td>13%</td>
+                    <td><span class="nowrap">
+                        <a href="/w/Emerald" title="Emerald">
+                            <span class="sprite-text">Emerald</span>
+                        </a>
+                    </span></td>
+                    <td>6 × <span class="nowrap">
+                        <a href="/w/Packed_Ice" title="Packed Ice">
+                            <span class="sprite-text">Packed Ice</span>
+                        </a>
+                    </span></td>
+                    <td>1</td>
+                </tr>
+                <tr>
+                    <td>13%</td>
+                    <td>6 × <span class="nowrap">
+                        <a href="/w/Emerald" title="Emerald">
+                            <span class="sprite-text">Emerald</span>
+                        </a>
+                    </span></td>
+                    <td>6 × <span class="nowrap">
+                        <a href="/w/Blue_Ice" title="Blue Ice">
+                            <span class="sprite-text">Blue Ice</span>
+                        </a>
+                    </span></td>
+                    <td>1</td>
+                </tr>
+                <tr>
+                    <td>7%</td>
+                    <td>5 × <span class="nowrap">
+                        <a href="/w/Emerald" title="Emerald">
+                            <span class="sprite-text">Emerald</span>
+                        </a>
+                    </span></td>
+                    <td><span class="nowrap">
+                        <a href="/w/Nautilus_Shell" title="Nautilus Shell">
+                            <span class="sprite-text">Nautilus Shell</span>
+                        </a>
+                    </span></td>
+                    <td>1</td>
+                </tr>
+            </tbody>
+        </table>
+        '''
+
+        result = parse_trading(html)
+
+        # Should parse all 3 wandering trader trades
+        assert len(result) == 3
+
+        # Verify each item is present
+        output_items = {t.outputs[0].name for t in result}
+        assert "Packed Ice" in output_items
+        assert "Blue Ice" in output_items
+        assert "Nautilus Shell" in output_items
+
+        # All should have Emerald as input and Wandering Trader as villager type
+        for trade in result:
+            assert trade.transformation_type == TransformationType.TRADING
+            assert trade.inputs[0].name == "Emerald"
+            assert trade.metadata["villager_type"] == "Wandering Trader"
+
     def test_parse_mob_drops_simple(self):
         """Test parsing mob drops."""
         from src.core.parsers import parse_mob_drops
