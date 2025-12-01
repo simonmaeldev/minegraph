@@ -22,6 +22,23 @@ try:
 except ImportError:
     FzfPrompt = None
 
+try:
+    # Try package-style import first (for pytest and module usage)
+    from src.graph_utils import (
+        Graph3DBuilder,
+        load_transformations_from_csv,
+        build_graph_from_csv,
+        get_visual_subgraph
+    )
+except ModuleNotFoundError:
+    # Fall back to direct import (for script execution)
+    from graph_utils import (
+        Graph3DBuilder,
+        load_transformations_from_csv,
+        build_graph_from_csv,
+        get_visual_subgraph
+    )
+
 
 # Default color mappings if config file is missing or incomplete
 DEFAULT_COLORS = {
@@ -269,202 +286,6 @@ def load_item_image(
         return None
 
 
-def load_transformations_from_csv(
-    csv_path: str,
-    filter_types: Optional[List[str]] = None
-) -> List[Dict]:
-    """
-    Load transformations from CSV file with optional type filtering.
-
-    Args:
-        csv_path: Path to the transformations CSV file
-        filter_types: Optional list of transformation types to include (None = all types)
-
-    Returns:
-        List of transformation dictionaries with parsed data
-    """
-    transformations = []
-    total_count = 0
-    filtered_count = 0
-
-    csv_file = Path(csv_path)
-    if not csv_file.exists():
-        raise FileNotFoundError(f"CSV file not found: {csv_path}")
-
-    # Convert filter_types to set for faster lookup
-    filter_set = set(filter_types) if filter_types else None
-
-    with open(csv_file, 'r', encoding='utf-8') as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            # Parse JSON arrays in input_items and output_items
-            try:
-                total_count += 1
-                trans_type = row['transformation_type']
-
-                # Apply type filtering if specified
-                if filter_set is not None and trans_type not in filter_set:
-                    filtered_count += 1
-                    continue
-
-                inputs = json.loads(row['input_items'])
-                outputs = json.loads(row['output_items'])
-                metadata = json.loads(row['metadata'])
-
-                transformation = {
-                    'transformation_type': trans_type,
-                    'input_items': inputs,
-                    'output_items': outputs,
-                    'metadata': metadata
-                }
-                transformations.append(transformation)
-            except (json.JSONDecodeError, KeyError) as e:
-                logging.warning(f"Skipping malformed row: {e}")
-                continue
-
-    if filter_types:
-        logging.info(
-            f"Loaded {len(transformations)} transformations from {csv_path} "
-            f"(filtered out {filtered_count} of {total_count} total)"
-        )
-    else:
-        logging.info(f"Loaded {len(transformations)} transformations from {csv_path}")
-
-    return transformations
-
-
-class Graph3DBuilder:
-    """Manages construction of NetworkX graphs for 3D visualization."""
-
-    def __init__(self):
-        """Initialize the graph builder."""
-        self.graph = nx.DiGraph()
-        self.intermediate_counter = 0
-
-    def add_item_node(self, item_name: str) -> None:
-        """
-        Add an item node to the graph.
-
-        Args:
-            item_name: Name of the item
-        """
-        if not self.graph.has_node(item_name):
-            self.graph.add_node(item_name, node_type='item')
-
-    def create_intermediate_node(self) -> str:
-        """
-        Create a unique intermediate node for multi-input transformations.
-
-        Returns:
-            Unique identifier for the intermediate node
-        """
-        node_id = f"intermediate_{self.intermediate_counter}"
-        self.intermediate_counter += 1
-        self.graph.add_node(node_id, node_type='intermediate')
-        return node_id
-
-    def add_edge(self, from_node: str, to_node: str, transformation_type: str) -> None:
-        """
-        Add an edge with transformation type metadata.
-
-        Args:
-            from_node: Source node name
-            to_node: Target node name
-            transformation_type: Type of transformation
-        """
-        self.graph.add_edge(from_node, to_node, transformation_type=transformation_type)
-
-    def add_single_input_transformation(
-        self,
-        input_item: str,
-        output_item: str,
-        transformation_type: str
-    ) -> None:
-        """
-        Add a single-input transformation edge.
-
-        Args:
-            input_item: Name of the input item
-            output_item: Name of the output item
-            transformation_type: Type of transformation
-        """
-        self.add_item_node(input_item)
-        self.add_item_node(output_item)
-        self.add_edge(input_item, output_item, transformation_type)
-
-    def add_multi_input_transformation(
-        self,
-        input_items: List[str],
-        output_item: str,
-        transformation_type: str
-    ) -> None:
-        """
-        Add a multi-input transformation with intermediate node.
-
-        Args:
-            input_items: List of input item names
-            output_item: Name of the output item
-            transformation_type: Type of transformation
-        """
-        # Create intermediate node
-        intermediate = self.create_intermediate_node()
-
-        # Add edges from all inputs to intermediate
-        for input_item in input_items:
-            self.add_item_node(input_item)
-            self.add_edge(input_item, intermediate, transformation_type)
-
-        # Add edge from intermediate to output
-        self.add_item_node(output_item)
-        self.add_edge(intermediate, output_item, transformation_type)
-
-
-def build_graph_from_csv(
-    csv_path: str,
-    color_config: Dict[str, str],
-    filter_types: Optional[List[str]] = None
-) -> nx.DiGraph:
-    """
-    Build NetworkX graph from CSV data with optional type filtering.
-
-    Args:
-        csv_path: Path to transformations CSV file
-        color_config: Color configuration dictionary
-        filter_types: Optional list of transformation types to include
-
-    Returns:
-        NetworkX DiGraph with all transformations
-    """
-    transformations = load_transformations_from_csv(csv_path, filter_types)
-    builder = Graph3DBuilder()
-
-    for trans in transformations:
-        trans_type = trans['transformation_type']
-        inputs = trans['input_items']
-        outputs = trans['output_items']
-
-        # Assume single output (as per data model validation)
-        output_item = outputs[0] if outputs else None
-        if not output_item:
-            logging.warning(f"Skipping transformation with no output: {trans}")
-            continue
-
-        # Add transformation based on number of inputs
-        if len(inputs) == 1:
-            builder.add_single_input_transformation(inputs[0], output_item, trans_type)
-        else:
-            builder.add_multi_input_transformation(inputs, output_item, trans_type)
-
-    # Log statistics
-    item_nodes = [n for n in builder.graph.nodes() if builder.graph.nodes[n].get('node_type') == 'item']
-    logging.info(f"Graph contains {len(item_nodes)} unique items")
-    logging.info(f"Graph contains {builder.intermediate_counter} multi-input transformations")
-    logging.info(f"Graph contains {builder.graph.number_of_nodes()} total nodes")
-    logging.info(f"Graph contains {builder.graph.number_of_edges()} edges")
-
-    return builder.graph
-
-
 def compute_3d_layout(graph: nx.DiGraph) -> Dict[str, Tuple[float, float, float]]:
     """
     Compute 3D positions for graph nodes using spring layout.
@@ -605,10 +426,8 @@ def render_3d_graph(
             normalize=False  # Use actual vector length
         )
 
-    # Initialize image cache
+    # Initialize image cache and containers
     image_cache: Dict[str, Optional[np.ndarray]] = {}
-
-    # Plot item nodes (larger, colored or with images)
     item_scatter = None
     items_with_images = []
     items_without_images = []
@@ -626,8 +445,26 @@ def render_3d_graph(
         )
         logging.info("Created interactive image size slider (0.5x - 2.0x, default: 1.0x)")
 
+    # Plot intermediate nodes (smaller, gray) - RENDER FIRST (bottom layer)
+    intermediate_scatter = None
+    if intermediate_nodes:
+        int_xs = [pos[node][0] for node in intermediate_nodes]
+        int_ys = [pos[node][1] for node in intermediate_nodes]
+        int_zs = [pos[node][2] for node in intermediate_nodes]
+        int_sizes_list = [node_sizes[node] for node in intermediate_nodes]
+
+        intermediate_scatter = ax.scatter(
+            int_xs, int_ys, int_zs,
+            s=int_sizes_list,
+            c='#95a5a6',  # Gray color for intermediate nodes
+            alpha=0.5,
+            edgecolors='none',
+            depthshade=True
+        )
+
+    # Render item nodes (either as spheres or identify which need images)
     if use_images and item_nodes:
-        # Try to load images for each item
+        # Try to load images for each item to categorize them
         for node in item_nodes:
             img = load_item_image(node, images_dir, image_cache)
             if img is not None:
@@ -635,46 +472,7 @@ def render_3d_graph(
             else:
                 items_without_images.append(node)
 
-        # Render items with images using AnnotationBbox approach
-        for node in items_with_images:
-            img = image_cache[node]
-            x, y, z = pos[node]
-
-            # Calculate zoom factor based on node size
-            zoom = np.sqrt(node_sizes[node]) / 100.0
-
-            # Create OffsetImage that will face the camera
-            imagebox = OffsetImage(img, zoom=zoom)
-            imagebox.image.axes = ax
-
-            # Project 3D coordinates to 2D screen space
-            x2, y2, _ = proj3d.proj_transform(x, y, z, ax.get_proj())
-
-            # Create AnnotationBbox with the image at the projected 2D position
-            ab = AnnotationBbox(
-                imagebox,
-                (x2, y2),
-                xycoords='data',
-                frameon=False,
-                pad=0,
-                box_alignment=(0.5, 0.5)
-            )
-
-            # Add the annotation to the axes
-            ax.add_artist(ab)
-
-            # Store for later updates during camera rotation and zoom
-            annotation_boxes.append({
-                'ab': ab,
-                'node': node,
-                'pos_3d': (x, y, z),
-                'base_zoom': zoom,
-                'imagebox': imagebox
-            })
-
-        logging.info(f"Rendered {len(items_with_images)} items with images")
-
-        # Render items without images as spheres (fallback)
+        # Render items without images as spheres (fallback) - MIDDLE LAYER
         if items_without_images:
             fallback_xs = [pos[node][0] for node in items_without_images]
             fallback_ys = [pos[node][1] for node in items_without_images]
@@ -692,7 +490,7 @@ def render_3d_graph(
             )
             logging.info(f"Rendered {len(items_without_images)} items as spheres (no image)")
 
-        # For hover functionality, we need a scatter plot with all item positions
+        # For hover functionality, create invisible scatter plot for detection
         if item_nodes:
             item_xs = [pos[node][0] for node in item_nodes]
             item_ys = [pos[node][1] for node in item_nodes]
@@ -708,6 +506,47 @@ def render_3d_graph(
                 edgecolors='none',
                 depthshade=False
             )
+
+        # Render items with images using AnnotationBbox - TOP LAYER (rendered last)
+        for node in items_with_images:
+            img = image_cache[node]
+            x, y, z = pos[node]
+
+            # Calculate zoom factor based on node size
+            zoom = np.sqrt(node_sizes[node]) / 100.0
+
+            # Create OffsetImage that will face the camera
+            imagebox = OffsetImage(img, zoom=zoom)
+            imagebox.image.axes = ax
+
+            # Project 3D coordinates to 2D screen space
+            x2, y2, _ = proj3d.proj_transform(x, y, z, ax.get_proj())
+
+            # Create AnnotationBbox with the image at the projected 2D position
+            # Use high zorder to ensure images render on top of all other elements
+            ab = AnnotationBbox(
+                imagebox,
+                (x2, y2),
+                xycoords='data',
+                frameon=False,
+                pad=0,
+                box_alignment=(0.5, 0.5),
+                zorder=1000  # High zorder ensures images appear on top
+            )
+
+            # Add the annotation to the axes
+            ax.add_artist(ab)
+
+            # Store for later updates during camera rotation and zoom
+            annotation_boxes.append({
+                'ab': ab,
+                'node': node,
+                'pos_3d': (x, y, z),
+                'base_zoom': zoom,
+                'imagebox': imagebox
+            })
+
+        logging.info(f"Rendered {len(items_with_images)} items with images")
 
     else:
         # Original sphere rendering (no images)
@@ -726,23 +565,6 @@ def render_3d_graph(
                 linewidths=0.5,
                 depthshade=True
             )
-
-    # Plot intermediate nodes (smaller, gray)
-    intermediate_scatter = None
-    if intermediate_nodes:
-        int_xs = [pos[node][0] for node in intermediate_nodes]
-        int_ys = [pos[node][1] for node in intermediate_nodes]
-        int_zs = [pos[node][2] for node in intermediate_nodes]
-        int_sizes_list = [node_sizes[node] for node in intermediate_nodes]
-
-        intermediate_scatter = ax.scatter(
-            int_xs, int_ys, int_zs,
-            s=int_sizes_list,
-            c='#95a5a6',  # Gray color for intermediate nodes
-            alpha=0.5,
-            edgecolors='none',
-            depthshade=True
-        )
 
     # Set labels and title
     ax.set_xlabel('X', fontsize=10)
@@ -929,6 +751,79 @@ def visualize_3d(
     plt.show()
 
 
+def visualize_subgraph(
+    node_name: str,
+    csv_path: str = "output/transformations.csv",
+    config_path: str = "config/graph_colors.txt",
+    output_path: Optional[str] = None,
+    use_images: bool = False,
+    images_dir: str = "images",
+    filter_types: Optional[List[str]] = None
+) -> None:
+    """
+    Visualize forward-directed subgraph starting from a specific node.
+
+    This function extracts and visualizes all items that can be produced
+    (directly or indirectly) from the starting node, following only forward
+    transformation paths. For multi-input transformations, all required
+    inputs are shown for context but only the starting node's forward
+    path is explored.
+
+    Example usage:
+        # Visualize all items craftable from Oak Planks
+        visualize_subgraph('Oak Planks', use_images=True)
+
+        # Visualize only crafting transformations from Iron Ingot
+        visualize_subgraph('Iron Ingot', filter_types=['crafting', 'smithing'])
+
+    Args:
+        node_name: Name of the starting item node
+        csv_path: Path to transformations CSV file
+        config_path: Path to color configuration file
+        output_path: Optional path to save figure (if None, only displays)
+        use_images: Whether to use item images instead of spheres
+        images_dir: Directory containing item images
+        filter_types: Optional list of transformation types to include
+    """
+    # Extract subgraph
+    logging.info(f"Extracting subgraph starting from '{node_name}'...")
+    graph = get_visual_subgraph(node_name, csv_path, filter_types)
+
+    # Load color configuration
+    color_config = load_color_config(config_path)
+
+    # Compute 3D layout
+    logging.info("Computing 3D layout...")
+    pos = compute_3d_layout(graph)
+
+    # Calculate node sizes
+    logging.info("Calculating node sizes...")
+    node_sizes = calculate_node_sizes(graph, pos)
+
+    # Get edge colors
+    logging.info("Mapping edge colors...")
+    edge_colors = get_edge_colors(graph, color_config)
+
+    # Render the 3D visualization
+    logging.info("Rendering 3D visualization...")
+    render_3d_graph(
+        graph, pos, node_sizes, edge_colors, color_config,
+        use_images=use_images,
+        images_dir=images_dir
+    )
+
+    # Save to file if output path provided
+    if output_path:
+        output_file = Path(output_path)
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(output_path, dpi=150, bbox_inches='tight')
+        logging.info(f"Saved visualization to {output_path}")
+
+    # Display interactive viewer
+    logging.info("Opening interactive 3D viewer...")
+    plt.show()
+
+
 def collect_options(args, csv_path: str) -> Dict:
     """
     Collect visualization options from CLI args and interactive fzf prompts.
@@ -1031,6 +926,11 @@ def main():
         help='Disable interactive fzf prompts and use defaults/CLI args only'
     )
 
+    parser.add_argument(
+        '--start-node',
+        help='Extract and visualize subgraph starting from this item node (e.g., "Oak Planks")'
+    )
+
     args = parser.parse_args()
 
     # Configure logging with initial level (may be updated by interactive selection)
@@ -1049,19 +949,36 @@ def main():
         logging.debug("Verbose logging enabled via interactive selection")
 
     try:
-        visualize_3d(
-            csv_path=args.input,
-            config_path=args.config,
-            output_path=args.output,
-            use_images=options['use_images'],
-            images_dir=args.images_dir,
-            filter_types=options['filter_types']
-        )
+        # Check if subgraph visualization requested
+        if args.start_node:
+            visualize_subgraph(
+                node_name=args.start_node,
+                csv_path=args.input,
+                config_path=args.config,
+                output_path=args.output,
+                use_images=options['use_images'],
+                images_dir=args.images_dir,
+                filter_types=options['filter_types']
+            )
 
-        if args.output:
-            print(f"Successfully generated 3D visualization: {args.output}")
+            if args.output:
+                print(f"Successfully generated subgraph visualization from '{args.start_node}': {args.output}")
+            else:
+                print(f"Subgraph visualization from '{args.start_node}' displayed in interactive viewer")
         else:
-            print("3D visualization displayed in interactive viewer")
+            visualize_3d(
+                csv_path=args.input,
+                config_path=args.config,
+                output_path=args.output,
+                use_images=options['use_images'],
+                images_dir=args.images_dir,
+                filter_types=options['filter_types']
+            )
+
+            if args.output:
+                print(f"Successfully generated 3D visualization: {args.output}")
+            else:
+                print("3D visualization displayed in interactive viewer")
 
     except Exception as e:
         logging.error(f"Failed to generate 3D visualization: {e}")

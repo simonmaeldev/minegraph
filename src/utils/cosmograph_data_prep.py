@@ -25,8 +25,9 @@ import csv
 import json
 import logging
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional, Set, Literal
 import pandas as pd
+import networkx as nx
 
 
 # Configure logging
@@ -159,15 +160,17 @@ class CosmographDataBuilder:
     - Computing node sizes based on connectivity
     """
 
-    def __init__(self, transformations: List[Dict], color_config: Dict[str, str]):
+    def __init__(self, transformations: List[Dict], color_config: Dict[str, str], include_intermediate_nodes: bool = True):
         """Initialize the data builder.
 
         Args:
             transformations: List of transformation dictionaries
             color_config: Mapping of transformation types to colors
+            include_intermediate_nodes: If True, create intermediate nodes for multi-input transformations
         """
         self.transformations = transformations
         self.color_config = color_config
+        self.include_intermediate_nodes = include_intermediate_nodes
         self.intermediate_counter = 0
 
     def build_points_dataframe(self) -> pd.DataFrame:
@@ -175,7 +178,7 @@ class CosmographDataBuilder:
 
         Creates nodes for:
         1. All unique items from transformations
-        2. Intermediate nodes for multi-input transformations
+        2. Intermediate nodes for multi-input transformations (if enabled)
 
         Returns:
             DataFrame with columns: id, label, node_type, size, color
@@ -200,23 +203,24 @@ class CosmographDataBuilder:
                 'color': DEFAULT_ITEM_COLOR
             })
 
-        # Add intermediate nodes for multi-input transformations
-        for trans in self.transformations:
-            if len(trans['input_items']) > 1:
-                # Create intermediate node for this multi-input transformation
-                intermediate_id = f"intermediate_{self.intermediate_counter}"
-                self.intermediate_counter += 1
+        # Add intermediate nodes for multi-input transformations (if enabled)
+        if self.include_intermediate_nodes:
+            for trans in self.transformations:
+                if len(trans['input_items']) > 1:
+                    # Create intermediate node for this multi-input transformation
+                    intermediate_id = f"intermediate_{self.intermediate_counter}"
+                    self.intermediate_counter += 1
 
-                points_data.append({
-                    'id': intermediate_id,
-                    'label': '',  # No label for intermediate nodes
-                    'node_type': 'intermediate',
-                    'size': float(INTERMEDIATE_NODE_SIZE),
-                    'color': INTERMEDIATE_NODE_COLOR
-                })
+                    points_data.append({
+                        'id': intermediate_id,
+                        'label': '',  # No label for intermediate nodes
+                        'node_type': 'intermediate',
+                        'size': float(INTERMEDIATE_NODE_SIZE),
+                        'color': INTERMEDIATE_NODE_COLOR
+                    })
 
-                # Store the intermediate ID for link building
-                trans['_intermediate_id'] = intermediate_id
+                    # Store the intermediate ID for link building
+                    trans['_intermediate_id'] = intermediate_id
 
         df = pd.DataFrame(points_data)
         logger.info(f"Built points DataFrame: {len(items_seen)} items + {self.intermediate_counter} intermediate nodes")
@@ -228,7 +232,9 @@ class CosmographDataBuilder:
 
         Creates edges for:
         1. Single-input transformations: direct input -> output
-        2. Multi-input transformations: inputs -> intermediate -> output
+        2. Multi-input transformations:
+           - If intermediate nodes enabled: inputs -> intermediate -> output
+           - If intermediate nodes disabled: direct inputs -> output
 
         Returns:
             DataFrame with columns: source, target, transformation_type, color, arrows
@@ -251,29 +257,42 @@ class CosmographDataBuilder:
                         'arrows': True
                     })
             else:
-                # Multi-input: edges from each input to intermediate, then intermediate to output
-                intermediate_id = trans.get('_intermediate_id')
+                # Multi-input transformations
+                if self.include_intermediate_nodes:
+                    # With intermediate nodes: inputs -> intermediate -> output
+                    intermediate_id = trans.get('_intermediate_id')
 
-                if intermediate_id:
-                    # Create edges from inputs to intermediate node
+                    if intermediate_id:
+                        # Create edges from inputs to intermediate node
+                        for input_item in trans['input_items']:
+                            links_data.append({
+                                'source': input_item,
+                                'target': intermediate_id,
+                                'transformation_type': trans_type,
+                                'color': color,
+                                'arrows': True
+                            })
+
+                        # Create edge from intermediate to output
+                        for output_item in trans['output_items']:
+                            links_data.append({
+                                'source': intermediate_id,
+                                'target': output_item,
+                                'transformation_type': trans_type,
+                                'color': color,
+                                'arrows': True
+                            })
+                else:
+                    # Without intermediate nodes: direct edges from each input to output
                     for input_item in trans['input_items']:
-                        links_data.append({
-                            'source': input_item,
-                            'target': intermediate_id,
-                            'transformation_type': trans_type,
-                            'color': color,
-                            'arrows': True
-                        })
-
-                    # Create edge from intermediate to output
-                    for output_item in trans['output_items']:
-                        links_data.append({
-                            'source': intermediate_id,
-                            'target': output_item,
-                            'transformation_type': trans_type,
-                            'color': color,
-                            'arrows': True
-                        })
+                        for output_item in trans['output_items']:
+                            links_data.append({
+                                'source': input_item,
+                                'target': output_item,
+                                'transformation_type': trans_type,
+                                'color': color,
+                                'arrows': True
+                            })
 
         df = pd.DataFrame(links_data)
         logger.info(f"Built links DataFrame: {len(df)} edges")
@@ -322,9 +341,115 @@ class CosmographDataBuilder:
         return points
 
 
+def get_parent_nodes_recursive(
+    seed_nodes: Set[str],
+    graph: nx.DiGraph
+) -> Set[str]:
+    """Recursively find all parent nodes (predecessors) of seed nodes.
+
+    Args:
+        seed_nodes: Starting nodes
+        graph: NetworkX directed graph
+
+    Returns:
+        Set of all nodes reachable by following predecessor edges
+    """
+    visited = set()
+    to_visit = set(seed_nodes)
+
+    while to_visit:
+        current = to_visit.pop()
+        if current in visited:
+            continue
+        visited.add(current)
+
+        # Add all predecessors of this node
+        for predecessor in graph.predecessors(current):
+            if predecessor not in visited:
+                to_visit.add(predecessor)
+
+    return visited
+
+
+def get_child_nodes_recursive(
+    seed_nodes: Set[str],
+    graph: nx.DiGraph
+) -> Set[str]:
+    """Recursively find all child nodes (successors) of seed nodes.
+
+    Args:
+        seed_nodes: Starting nodes
+        graph: NetworkX directed graph
+
+    Returns:
+        Set of all nodes reachable by following successor edges
+    """
+    visited = set()
+    to_visit = set(seed_nodes)
+
+    while to_visit:
+        current = to_visit.pop()
+        if current in visited:
+            continue
+        visited.add(current)
+
+        # Add all successors of this node
+        for successor in graph.successors(current):
+            if successor not in visited:
+                to_visit.add(successor)
+
+    return visited
+
+
+def get_main_component_nodes(
+    points: pd.DataFrame,
+    links: pd.DataFrame
+) -> Set[str]:
+    """Extract nodes in the main (largest) weakly connected component.
+
+    Builds a temporary NetworkX graph to identify connected components,
+    then returns the set of node IDs in the largest component.
+
+    Args:
+        points: Points DataFrame with 'id' column
+        links: Links DataFrame with 'source' and 'target' columns
+
+    Returns:
+        Set of node IDs in the main connected component
+    """
+    # Build temporary graph
+    graph = nx.DiGraph()
+
+    # Add all nodes
+    for _, row in points.iterrows():
+        graph.add_node(row['id'])
+
+    # Add all edges
+    for _, row in links.iterrows():
+        graph.add_edge(row['source'], row['target'])
+
+    # Find weakly connected components
+    components = list(nx.weakly_connected_components(graph))
+
+    if not components:
+        # Empty graph case
+        return set()
+
+    # Return the largest component
+    main_component = max(components, key=len)
+    logger.info(f"Main component has {len(main_component)} nodes out of {len(graph.nodes())}")
+
+    return main_component
+
+
 def prepare_cosmograph_data(
     csv_path: str,
-    config_path: str
+    config_path: str,
+    only_main_component: bool = False,
+    filter_link: List[str] = None,
+    include_intermediate_nodes: bool = True,
+    starting_nodes: Optional[List[str]] = None,
+    exploration: Literal['parent', 'child', 'both'] = 'both'
 ) -> Tuple[pd.DataFrame, pd.DataFrame, Dict[str, str]]:
     """Prepare all data needed for Cosmograph visualization.
 
@@ -333,10 +458,20 @@ def prepare_cosmograph_data(
     2. Loading transformation data
     3. Building points and links DataFrames
     4. Computing node sizes
+    5. Optionally filtering to only the main connected component
+    6. Optionally excluding intermediate nodes
+    7. Optionally filtering by seed nodes and exploration direction
 
     Args:
         csv_path: Path to transformations CSV file
         config_path: Path to color configuration file
+        only_main_component: If True, filter to only nodes in the largest connected component
+        filter_link: Optional list of transformation types to include
+        include_intermediate_nodes: If True, include intermediate nodes for multi-input transformations
+        starting_nodes: Optional list of seed node names. If None or empty, all nodes are kept.
+                       If provided, only nodes reachable from seeds (based on exploration direction) are retained.
+        exploration: Direction of recursive exploration from seeds - 'parent' (predecessors),
+                    'child' (successors), or 'both' (both directions).
 
     Returns:
         Tuple of (points_df, links_df, color_config)
@@ -347,6 +482,34 @@ def prepare_cosmograph_data(
         ...     'config/graph_colors.txt'
         ... )
         >>> print(f"Nodes: {len(points)}, Edges: {len(links)}")
+
+        >>> # Explore all ingredients (parents) needed to craft a Diamond Sword
+        >>> points, links, config = prepare_cosmograph_data(
+        ...     'output/technical_transformations.csv',
+        ...     'config/graph_colors.txt',
+        ...     only_main_component=True,
+        ...     include_intermediate_nodes=False,
+        ...     starting_nodes=['Diamond Sword'],
+        ...     exploration='parent'
+        ... )
+
+        >>> # Explore all items that can be crafted from Iron Ingot (children)
+        >>> points, links, config = prepare_cosmograph_data(
+        ...     'output/technical_transformations.csv',
+        ...     'config/graph_colors.txt',
+        ...     only_main_component=True,
+        ...     include_intermediate_nodes=False,
+        ...     starting_nodes=['Iron Ingot'],
+        ...     exploration='child'
+        ... )
+
+        >>> # To get only the main component without intermediate nodes:
+        >>> points, links, config = prepare_cosmograph_data(
+        ...     'output/transformations.csv',
+        ...     'config/graph_colors.txt',
+        ...     only_main_component=True,
+        ...     include_intermediate_nodes=False
+        ... )
     """
     logger.info("Starting Cosmograph data preparation...")
 
@@ -355,12 +518,97 @@ def prepare_cosmograph_data(
     transformations = load_transformations_from_csv(csv_path)
 
     # Build DataFrames
-    builder = CosmographDataBuilder(transformations, color_config)
+    builder = CosmographDataBuilder(transformations, color_config, include_intermediate_nodes)
     points = builder.build_points_dataframe()
     links = builder.build_links_dataframe()
 
+    # Filter to only get the transformations types
+    if filter_link:
+        filtered_links = links[links['transformation_type'].isin(filter_link)]
+        filtered_node_ids = set(filtered_links['source']).union(set(filtered_links['target']))
+        filtered_points = points[points['id'].isin(filtered_node_ids)]
+        points = filtered_points
+        links = filtered_links
+
+    # Filter to main component if requested
+    if only_main_component:
+        logger.info("Filtering to main connected component...")
+        main_component_nodes = get_main_component_nodes(points, links)
+
+        # Filter points to only those in the main component
+        points = points[points['id'].isin(main_component_nodes)].copy()
+
+        # Filter links to only those where both source and target are in the main component
+        links = links[
+            (links['source'].isin(main_component_nodes)) &
+            (links['target'].isin(main_component_nodes))
+        ].copy()
+
+        logger.info(f"Filtered to main component: {len(points)} nodes, {len(links)} edges")
+
+
+    # Apply seed-based filtering if seeds are provided
+    seed_nodes_set = set()
+    if starting_nodes:
+        starting_nodes = [s for s in starting_nodes if s]  # Filter out empty strings
+        if starting_nodes:
+            logger.info(f"Applying seed-based filtering with {len(starting_nodes)} seeds, exploration: {exploration}")
+
+            # Build temporary NetworkX graph
+            temp_graph = nx.DiGraph()
+            for _, row in points.iterrows():
+                temp_graph.add_node(row['id'])
+            for _, row in links.iterrows():
+                temp_graph.add_edge(row['source'], row['target'])
+
+            # Validate seeds exist in the graph
+            seed_nodes_set = set(starting_nodes)
+            graph_nodes = set(temp_graph.nodes())
+            invalid_seeds = seed_nodes_set - graph_nodes
+            if invalid_seeds:
+                logger.warning(f"Seeds not found in graph: {invalid_seeds}")
+                seed_nodes_set = seed_nodes_set & graph_nodes
+
+            if seed_nodes_set:
+                # Perform recursive exploration based on direction
+                if exploration == 'parent':
+                    filtered_nodes = get_parent_nodes_recursive(seed_nodes_set, temp_graph)
+                elif exploration == 'child':
+                    filtered_nodes = get_child_nodes_recursive(seed_nodes_set, temp_graph)
+                else:  # 'both'
+                    parent_nodes = get_parent_nodes_recursive(seed_nodes_set, temp_graph)
+                    child_nodes = get_child_nodes_recursive(seed_nodes_set, temp_graph)
+                    filtered_nodes = parent_nodes | child_nodes
+
+                # Filter points to only nodes in filtered_nodes
+                before_node_count = len(points)
+                points = points[points['id'].isin(filtered_nodes)].copy()
+                logger.info(f"Filtered nodes: {before_node_count} -> {len(points)}")
+
+                # Filter links to only edges where both source and target are in filtered_nodes
+                before_edge_count = len(links)
+                links = links[
+                    (links['source'].isin(filtered_nodes)) &
+                    (links['target'].isin(filtered_nodes))
+                ].copy()
+                logger.info(f"Filtered edges: {before_edge_count} -> {len(links)}")
+
+                # Color seed nodes red and store for later sizing
+                for idx, row in points.iterrows():
+                    if row['id'] in seed_nodes_set:
+                        points.at[idx, 'color'] = '#FF0000'
+
     # Calculate node sizes
-    points = builder.calculate_node_sizes(points, links)
+    # points = builder.calculate_node_sizes(points, links)
+
+    # Apply 2x size multiplier to seed nodes
+    if seed_nodes_set:
+        for idx, row in points.iterrows():
+            if row['id'] in seed_nodes_set and row['node_type'] != 'intermediate':
+                current_size = row['size']
+                new_size = min(current_size * 2.0, MAX_NODE_SIZE)
+                points.at[idx, 'size'] = float(new_size)
+        logger.info(f"Applied 2x size multiplier to {len(seed_nodes_set)} seed nodes")
 
     logger.info("Data preparation complete!")
     logger.info(f"  Total nodes: {len(points)} ({sum(points['node_type'] == 'item')} items + {sum(points['node_type'] == 'intermediate')} intermediate)")

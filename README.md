@@ -10,7 +10,6 @@ Minegraph extracts transformation data from the Minecraft Wiki to create structu
 - **Brewing** (potions)
 - **Composting** (organic items to bone meal)
 - **Crafting** (shaped and shapeless recipes)
-- **Grindstone** (disenchanting)
 - **Mob drops** (with probabilities)
 - **Smelting** (furnace, blast furnace, smoker)
 - **Smithing** (netherite upgrades, armor trims)
@@ -131,6 +130,94 @@ uv run python src/download_item_images.py --help
   - Requires `ffmpeg` to be installed on your system
 - With 850+ items, full download may take 5-10 minutes
 - Failed downloads are logged but don't stop the process
+
+### Technical Item Compression
+
+Minegraph includes a technical item compressor that simplifies graph analysis by grouping functionally similar items together. For example, all wood plank types (Oak Planks, Spruce Planks, etc.) are compressed to a single "Planks" category.
+
+**Why Use Compression?**
+
+The full transformation graph contains 2400+ transformations with many item variations that function identically:
+- 12 different plank types that are interchangeable in most recipes
+- 28 different tipped arrow types with similar crafting patterns
+- Multiple wood types, log types, boat types, and sign types
+
+Compression reduces graph complexity by:
+- Grouping functionally equivalent items (e.g., all planks → "Planks")
+- Removing duplicate transformations created by compression (e.g., "Oak Planks + Stick → Pickaxe" and "Spruce Planks + Stick → Pickaxe" become one transformation)
+- Reducing from 2414 transformations to ~1991 transformations (423 duplicates removed)
+- Reducing from 1350 unique items to ~1241 technical categories
+
+**Usage:**
+
+```bash
+# Compress with statistics
+uv run python src/compress_technical.py --stats --verbose
+
+# Compress with custom paths
+uv run python src/compress_technical.py --input output/transformations.csv --output output/technical_transformations.csv
+
+# Validate compression output
+uv run python src/compress_technical.py --validate
+```
+
+**Example Compression:**
+
+Before compression:
+```
+crafting ["Oak Planks", "Stick"] → ["Wooden Pickaxe"]
+crafting ["Spruce Planks", "Stick"] → ["Wooden Pickaxe"]
+crafting ["Birch Planks", "Stick"] → ["Wooden Pickaxe"]
+```
+
+After compression (only one transformation kept):
+```
+crafting ["Planks", "Stick"] → ["Wooden Pickaxe"]
+```
+
+**Technical Categories:**
+
+The compressor groups items into technical categories:
+- **Planks**: All 12 plank types (Oak, Spruce, Birch, Jungle, Acacia, Dark Oak, Crimson, Warped, Mangrove, Cherry, Bamboo, Pale Oak)
+- **Tipped Arrow**: All 25+ arrow variations (Arrow of Poison, Arrow of Healing, etc.)
+- **Log**: All log types (Oak Log, Spruce Log, etc.)
+- **Stripped Log**: All stripped log variations
+- **Wood**: All wood block types
+- **Stripped Wood**: All stripped wood block variations
+- **Boat**: All boat types
+- **Boat with Chest**: All boats with chests
+- **Sign**: All sign types
+- **Hanging Sign**: All hanging sign types
+- **Hyphae**: Crimson and Warped hyphae (nether wood)
+- **Stripped Hyphae**: Stripped hyphae variations
+
+**Using Compressed Data:**
+
+The compressed CSV works seamlessly with all analysis and visualization tools:
+
+```bash
+# Analyze compressed graph
+uv run python src/analyze_graph.py --input output/technical_transformations.csv
+
+# Visualize compressed graph (3D)
+uv run python src/visualize_graph_3d.py --input output/technical_transformations.csv
+
+# Generate Cosmograph HTML
+uv run python src/generate_cosmosgl_html.py --input output/technical_transformations.csv
+```
+
+**Adding New Categories:**
+
+To add more technical categories, edit `src/technical_mappings.py`:
+
+```python
+TECHNICAL_MAPPINGS = {
+    "Planks": ["Oak Planks", "Spruce Planks", ...],
+    "Your Category": ["Item 1", "Item 2", ...],
+}
+```
+
+Then run the compression script to regenerate the compressed CSV.
 
 ### Visualize Transformation Graph
 

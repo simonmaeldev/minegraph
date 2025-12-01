@@ -19,6 +19,11 @@ Available Metrics:
     - Connected components (weakly and strongly connected, with disconnected nodes listed)
     - Edge count (total edges and nodes)
     - Graph density (ratio of actual edges to possible edges)
+    - Root nodes (items with no inputs)
+    - Leaf nodes (items with no outputs)
+    - Betweenness centrality (items that bridge many paths)
+    - VoteRank (most important items by voting algorithm)
+    - Parent Score (importance propagation to ancestor nodes)
 """
 
 import argparse
@@ -29,11 +34,19 @@ from typing import Dict, List, Optional, Any
 
 import networkx as nx
 
-# Import graph building functions from existing visualization script
-from visualize_graph_3d import (
-    load_transformations_from_csv,
-    load_color_config
-)
+# Configure NetworkX to use GPU-accelerated cugraph backend (disabled if not available)
+# nx.config.backend_priority = ["cugraph"]
+# nx.config.warnings_to_ignore.add("cache")
+
+# Import graph building functions from graph utilities
+try:
+    # Try package-style import first (for pytest and module usage)
+    from src.graph_utils import load_transformations_from_csv
+    from src.visualize_graph_3d import load_color_config
+except ModuleNotFoundError:
+    # Fall back to direct import (for script execution)
+    from graph_utils import load_transformations_from_csv
+    from visualize_graph_3d import load_color_config
 
 
 class AnalysisGraphBuilder:
@@ -432,6 +445,7 @@ def analyze_connected_components(graph: nx.DiGraph) -> None:
             component_size = len(component)
             total_disconnected += component_size
 
+
             # Sort node names alphabetically for consistent output
             sorted_nodes = sorted(component)
 
@@ -439,6 +453,7 @@ def analyze_connected_components(graph: nx.DiGraph) -> None:
             for node in sorted_nodes:
                 print(f"    - {node}")
             print()  # Blank line between components
+
 
         print_metric("Total disconnected nodes", total_disconnected, "nodes")
     else:
@@ -499,6 +514,340 @@ def analyze_density(graph: nx.DiGraph) -> None:
     print(f"    (For {num_nodes} nodes, max possible edges: {num_nodes * (num_nodes - 1)})")
 
 
+def get_main_component(graph: nx.DiGraph) -> nx.DiGraph:
+    """
+    Extract the main (largest) weakly connected component from the graph.
+
+    Args:
+        graph: NetworkX directed graph
+
+    Returns:
+        Subgraph containing only the main connected component
+    """
+    components = list(nx.weakly_connected_components(graph))
+    if not components:
+        return nx.DiGraph()
+
+    # The largest component is the main component
+    main_component_nodes = max(components, key=len)
+    return graph.subgraph(main_component_nodes).copy()
+
+
+def analyze_root_nodes(graph: nx.DiGraph) -> None:
+    """
+    Find and print root nodes (nodes with in-degree = 0).
+
+    Root nodes are items that are not produced by any transformation,
+    typically representing base materials or resources.
+
+    Args:
+        graph: NetworkX directed graph
+    """
+    print_section_header("Root Nodes Analysis (In-degree = 0)")
+
+    num_nodes = graph.number_of_nodes()
+
+    if num_nodes == 0:
+        print("  Cannot compute root nodes: graph has no nodes")
+        return
+
+    # Find nodes with in-degree = 0
+    root_nodes = [node for node, in_deg in graph.in_degree() if in_deg == 0]
+
+    print_metric("Number of root nodes", len(root_nodes), "nodes")
+
+    if not root_nodes:
+        print("  No root nodes found (all nodes have incoming edges)")
+
+
+def analyze_leaf_nodes(graph: nx.DiGraph) -> None:
+    """
+    Find and print leaf nodes (nodes with out-degree = 0).
+
+    Leaf nodes are items that are not used as inputs to any transformation,
+    typically representing final products or end-game items.
+
+    Args:
+        graph: NetworkX directed graph
+    """
+    print_section_header("Leaf Nodes Analysis (Out-degree = 0)")
+
+    num_nodes = graph.number_of_nodes()
+
+    if num_nodes == 0:
+        print("  Cannot compute leaf nodes: graph has no nodes")
+        return
+
+    # Find nodes with out-degree = 0
+    leaf_nodes = [node for node, out_deg in graph.out_degree() if out_deg == 0]
+
+    print_metric("Number of leaf nodes", len(leaf_nodes), "nodes")
+
+    if not leaf_nodes:
+        print("  No leaf nodes found (all nodes have outgoing edges)")
+
+
+def analyze_betweenness_centrality(graph: nx.DiGraph, top_n: int = 10) -> None:
+    """
+    Calculate and display betweenness centrality for the graph.
+
+    Betweenness centrality measures how often a node appears on shortest paths
+    between other nodes. High betweenness indicates a node is a critical
+    bridge in the network.
+
+    Args:
+        graph: NetworkX directed graph
+        top_n: Number of top nodes to display (default: 10)
+    """
+    print_section_header("Betweenness Centrality Analysis")
+
+    num_nodes = graph.number_of_nodes()
+
+    if num_nodes == 0:
+        print("  Cannot compute betweenness centrality: graph has no nodes")
+        return
+
+    if num_nodes < 2:
+        print("  Cannot compute betweenness centrality: graph needs at least 2 nodes")
+        return
+
+    print(f"  Computing betweenness centrality for {num_nodes} nodes...")
+    print("  (This measures how often a node lies on shortest paths)")
+
+    # Calculate betweenness centrality
+    betweenness = nx.betweenness_centrality(graph)
+
+    # Sort nodes by betweenness centrality (descending)
+    sorted_nodes = sorted(betweenness.items(), key=lambda x: x[1], reverse=True)
+
+    # Display top N nodes
+    print(f"\n  Top {min(top_n, len(sorted_nodes))} nodes by betweenness centrality:")
+    print()
+    for i, (node, centrality) in enumerate(sorted_nodes[:top_n], 1):
+        print(f"  {i:2d}. {node:40s} {centrality:.6f}")
+
+    if len(sorted_nodes) > top_n:
+        print(f"\n  ... and {len(sorted_nodes) - top_n} more nodes")
+
+
+def analyze_eigenvector_centrality(graph: nx.DiGraph, top_n: int = 10) -> None:
+    """
+    Calculate and display eigenvector centrality for the graph.
+
+    Eigenvector centrality measures a node's influence based on the importance
+    of its neighbors. High eigenvector centrality indicates a node is connected
+    to other highly connected nodes.
+
+    Args:
+        graph: NetworkX directed graph
+        top_n: Number of top nodes to display (default: 10)
+    """
+    print_section_header("Eigenvector Centrality Analysis")
+
+    num_nodes = graph.number_of_nodes()
+
+    if num_nodes == 0:
+        print("  Cannot compute eigenvector centrality: graph has no nodes")
+        return
+
+    if num_nodes < 2:
+        print("  Cannot compute eigenvector centrality: graph needs at least 2 nodes")
+        return
+
+    print(f"  Computing eigenvector centrality for {num_nodes} nodes...")
+    print("  (This measures influence based on connections to important nodes)")
+
+    try:
+        # Calculate eigenvector centrality with increased iterations
+        eigenvector = nx.eigenvector_centrality(graph, max_iter=1000)
+
+        # Sort nodes by eigenvector centrality (descending)
+        sorted_nodes = sorted(eigenvector.items(), key=lambda x: x[1], reverse=True)
+
+        # Display top N nodes
+        print(f"\n  Top {min(top_n, len(sorted_nodes))} nodes by eigenvector centrality:")
+        print()
+        for i, (node, centrality) in enumerate(sorted_nodes[:top_n], 1):
+            print(f"  {i:2d}. {node:40s} {centrality:.6f}")
+
+        if len(sorted_nodes) > top_n:
+            print(f"\n  ... and {len(sorted_nodes) - top_n} more nodes")
+
+    except nx.PowerIterationFailedConvergence:
+        print("  WARNING: Eigenvector centrality calculation did not converge")
+        print("  This can happen with certain graph structures")
+    except nx.NetworkXError as e:
+        print(f"  ERROR: Could not compute eigenvector centrality: {e}")
+
+
+def analyze_voterank(graph: nx.DiGraph, top_n: int = 10) -> None:
+    """
+    Calculate and display voterank for the graph.
+
+    Args:
+        graph: NetworkX directed graph
+        top_n: Number of top nodes to display (default: 10)
+    """
+    print_section_header("VoteRank Analysis")
+
+    num_nodes = graph.number_of_nodes()
+
+    if num_nodes == 0:
+        print("  Cannot compute vote rank: graph has no nodes")
+        return
+
+    if num_nodes < 2:
+        print("  Cannot compute vote rank: graph needs at least 2 nodes")
+        return
+
+    print(f"  Computing vote rank for {num_nodes} nodes...")
+
+    try:
+        # Calculate vote rank with increased iterations
+        voterank = nx.voterank(graph, top_n)
+
+        # Display top N nodes
+        print(f"\n  Top {len(voterank)} nodes by voterank:")
+        print()
+        for i, node in enumerate(voterank[:top_n], 1):
+            print(f"  {i:2d}. {node:40s}")
+
+    except nx.NetworkXError as e:
+        print(f"  ERROR: Could not compute voterank: {e}")
+
+
+def add_score_parents(
+    starting_node: str,
+    graph: nx.DiGraph,
+    to_process: set[str],
+    processed: set[str],
+    scores: dict[str, float],
+    depth: int = 1
+) -> None:
+    """
+    Recursively traverse parent nodes and increment their scores based on depth.
+
+    This function performs a recursive backward traversal through the graph,
+    starting from a given node and visiting all ancestor nodes (parents).
+    Each visited node gets 1/depth added to its score, where depth starts at 1
+    for the starting node. The function uses sets to track processed and
+    to-process nodes to prevent infinite loops in cyclic graphs.
+
+    Args:
+        starting_node: The node to start traversal from
+        graph: NetworkX directed graph to traverse
+        to_process: Set of nodes that still need to be processed
+        processed: Set of nodes that have already been processed
+        scores: Dictionary mapping node names to their accumulated scores
+        depth: Current depth in traversal (starts at 1)
+
+    Returns:
+        None (modifies scores, to_process, and processed in-place)
+    """
+    # Initialize score for this node if not present, then add 1/depth
+    if starting_node not in scores:
+        scores[starting_node] = 0
+    scores[starting_node] += 1 / depth
+
+    # Get all parent nodes (predecessors in directed graph)
+    parents = list(graph.predecessors(starting_node))
+
+    # Add unprocessed parents to the to_process set with incremented depth
+    for parent in parents:
+        if parent not in processed and parent not in to_process:
+            to_process.add((parent, depth + 1))
+
+    # Mark current node as processed
+    processed.add(starting_node)
+
+    # Recursively process next node if any remain
+    if to_process:
+        next_item = to_process.pop()
+        # Handle both tuple (node, depth) and string (node) formats
+        if isinstance(next_item, tuple):
+            next_node, next_depth = next_item
+        else:
+            next_node = next_item
+            next_depth = depth + 1
+        add_score_parents(next_node, graph, to_process, processed, scores, next_depth)
+
+
+def analyze_parent_score(
+    graph: nx.DiGraph,
+    voterank_top_n: int = 20,
+    display_top_n: int = 20
+) -> None:
+    """
+    Analyze parent scores by propagating importance backward through the graph.
+
+    This metric identifies "critical base materials" by computing which items
+    appear in the ancestry of many important items. It works by:
+    1. Using VoteRank to identify the top N most important items
+    2. For each important item, recursively traversing all parent nodes
+    3. Incrementing a score for each parent encountered
+    4. Ranking items by their accumulated scores
+
+    High-scoring items are critical base materials that contribute to many
+    important end products. This complements VoteRank, which identifies
+    important end products but doesn't show which base materials are needed.
+
+    Args:
+        graph: NetworkX directed graph to analyze
+        voterank_top_n: Number of top VoteRank items to use as starting points
+        display_top_n: Number of top parent score items to display
+
+    Returns:
+        None (prints analysis to console)
+    """
+    print_section_header("Parent Score Analysis (Importance Propagation)")
+
+    num_nodes = graph.number_of_nodes()
+
+    if num_nodes < 2:
+        print("  Cannot compute parent score: graph needs at least 2 nodes")
+        return
+
+    print(f"  Computing parent scores for {num_nodes} nodes...")
+    print(f"  Using top {voterank_top_n} VoteRank items as importance sources...")
+
+    try:
+        # Get important items using VoteRank
+        voterank_items = nx.voterank(graph, voterank_top_n)
+
+        if not voterank_items:
+            print("  ERROR: VoteRank returned no items")
+            return
+
+        # Initialize scores dictionary (now uses float for depth-based scoring)
+        scores: dict[str, float] = {}
+
+        # Process each VoteRank item
+        for item in voterank_items:
+            # Initialize processing set with the starting item at depth 1
+            to_process: set = {(item, 1)}
+            processed: set[str] = set()
+
+            # Process all parents of this item
+            while to_process:
+                next_item = to_process.pop()
+                next_node, next_depth = next_item
+                add_score_parents(next_node, graph, to_process, processed, scores, next_depth)
+
+        # Sort items by score (descending)
+        sorted_items = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+
+        # Display top N items
+        print(f"\n  Top {min(display_top_n, len(sorted_items))} items by parent score:")
+        print("  (Items that appear in the ancestry of many important items)")
+        print()
+
+        for i, (node, score) in enumerate(sorted_items[:display_top_n], 1):
+            print(f"  {i:2d}. {node:40s} (score: {score})")
+
+    except nx.NetworkXError as e:
+        print(f"  ERROR: Could not compute parent score: {e}")
+
+
 def main() -> int:
     """
     Main execution function.
@@ -533,15 +882,46 @@ def main() -> int:
             print(f"Filtered by: {', '.join(filter_types)}")
 
         # ============================================================
-        # METRIC SELECTION: Comment/uncomment metrics to run
+        # GLOBAL ANALYSIS (Full Graph)
         # ============================================================
-        # Uncomment the metrics you want to compute:
+        print("\n" + "=" * 60)
+        print("  GLOBAL ANALYSIS (Full Graph)")
+        print("=" * 60)
 
         analyze_average_degree(graph)
         analyze_max_degree(graph)
         analyze_connected_components(graph)
         analyze_edge_count(graph)
         analyze_density(graph)
+
+        # ============================================================
+        # MAIN COMPONENT ANALYSIS
+        # ============================================================
+        print("\n" + "=" * 60)
+        print("  MAIN COMPONENT ANALYSIS")
+        print("=" * 60)
+
+        # Extract the main connected component
+        main_component = get_main_component(graph)
+
+        print(f"\nMain component contains {main_component.number_of_nodes()} nodes "
+              f"and {main_component.number_of_edges()} edges")
+
+        # Run focused analysis on main component
+        analyze_root_nodes(main_component)
+        analyze_leaf_nodes(main_component)
+        analyze_betweenness_centrality(main_component, top_n=10)
+        #analyze_eigenvector_centrality(main_component, top_n=10)
+        analyze_voterank(main_component, top_n=20)
+        analyze_parent_score(main_component, voterank_top_n=20, display_top_n=20)
+        #scores = {}
+        #add_score_parents("Redstone Dust", graph, set(), set(), scores)
+        #print(scores)
+        res = sorted(nx.strongly_connected_components(main_component), key=len, reverse=True)
+
+        for s in res : 
+            if len(s) > 1:
+                print(f"{len(s)}: {s}")
 
         # ============================================================
 

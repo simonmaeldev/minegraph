@@ -1,0 +1,18 @@
+{
+  "name": "minegraph",
+  "version": "1.0.0",
+  "description": "A Python-based data extraction system for Minecraft Java Edition transformation recipes. Minegraph downloads and parses wiki pages to build a comprehensive directed graph of all item transformations in the game.",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@cosmos.gl/graph": "^2.6.1"
+  }
+}

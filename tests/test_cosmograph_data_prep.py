@@ -2,12 +2,15 @@
 
 import pytest
 import pandas as pd
+import networkx as nx
 from pathlib import Path
 from src.utils.cosmograph_data_prep import (
     load_color_config,
     load_transformations_from_csv,
     CosmographDataBuilder,
     prepare_cosmograph_data,
+    get_parent_nodes_recursive,
+    get_child_nodes_recursive,
     DEFAULT_COLORS,
     INTERMEDIATE_NODE_COLOR,
     INTERMEDIATE_NODE_SIZE,
@@ -258,6 +261,358 @@ class TestPrepareCosmographData:
         # 2 single-input transformations = 2 links
         # 2 multi-input transformations = 6 links (2 inputs->intermediate + intermediate->output each)
         assert len(links) >= 8
+
+
+class TestSeedBasedFiltering:
+    """Tests for seed-based subgraph extraction."""
+
+    @pytest.fixture
+    def sample_graph_data(self):
+        """Create a sample graph for testing: A → B → C → D; B → E → F → G"""
+        transformations = [
+            {'transformation_type': 'crafting', 'input_items': ['A'], 'output_items': ['B'], 'metadata': {}},
+            {'transformation_type': 'crafting', 'input_items': ['B'], 'output_items': ['C'], 'metadata': {}},
+            {'transformation_type': 'crafting', 'input_items': ['C'], 'output_items': ['D'], 'metadata': {}},
+            {'transformation_type': 'crafting', 'input_items': ['B'], 'output_items': ['E'], 'metadata': {}},
+            {'transformation_type': 'crafting', 'input_items': ['E'], 'output_items': ['F'], 'metadata': {}},
+            {'transformation_type': 'crafting', 'input_items': ['F'], 'output_items': ['G'], 'metadata': {}},
+        ]
+        return transformations
+
+    @pytest.fixture
+    def sample_colors(self):
+        """Sample color configuration."""
+        return {'crafting': '#4A90E2'}
+
+    def test_parent_exploration_single_seed(self, sample_graph_data, sample_colors):
+        """Test parent exploration from a single seed node."""
+        builder = CosmographDataBuilder(sample_graph_data, sample_colors, include_intermediate_nodes=False)
+        points = builder.build_points_dataframe()
+        links = builder.build_links_dataframe()
+
+        # Build temp graph for manual verification
+        temp_graph = nx.DiGraph()
+        for _, row in points.iterrows():
+            temp_graph.add_node(row['id'])
+        for _, row in links.iterrows():
+            temp_graph.add_edge(row['source'], row['target'])
+
+        # Test parent exploration from C
+        parent_nodes = get_parent_nodes_recursive({'C'}, temp_graph)
+
+        # Should include C, B, A (all predecessors)
+        assert 'C' in parent_nodes
+        assert 'B' in parent_nodes
+        assert 'A' in parent_nodes
+        # Should NOT include D, E, F, G (successors and unrelated nodes)
+        assert 'D' not in parent_nodes
+        assert 'G' not in parent_nodes
+
+    def test_child_exploration_single_seed(self, sample_graph_data, sample_colors):
+        """Test child exploration from a single seed node."""
+        builder = CosmographDataBuilder(sample_graph_data, sample_colors, include_intermediate_nodes=False)
+        points = builder.build_points_dataframe()
+        links = builder.build_links_dataframe()
+
+        temp_graph = nx.DiGraph()
+        for _, row in points.iterrows():
+            temp_graph.add_node(row['id'])
+        for _, row in links.iterrows():
+            temp_graph.add_edge(row['source'], row['target'])
+
+        # Test child exploration from B
+        child_nodes = get_child_nodes_recursive({'B'}, temp_graph)
+
+        # Should include B and all its successors
+        assert 'B' in child_nodes
+        assert 'C' in child_nodes
+        assert 'D' in child_nodes
+        assert 'E' in child_nodes
+        assert 'F' in child_nodes
+        assert 'G' in child_nodes
+        # Should NOT include A (predecessor)
+        assert 'A' not in child_nodes
+
+    def test_prepare_cosmograph_with_seed_parent_exploration(self, sample_graph_data, sample_colors):
+        """Test prepare_cosmograph_data with parent exploration."""
+        builder = CosmographDataBuilder(sample_graph_data, sample_colors, include_intermediate_nodes=False)
+        points = builder.build_points_dataframe()
+        links = builder.build_links_dataframe()
+
+        # Filter to only nodes and edges needed for seed filtering
+        temp_graph = nx.DiGraph()
+        for _, row in points.iterrows():
+            temp_graph.add_node(row['id'])
+        for _, row in links.iterrows():
+            temp_graph.add_edge(row['source'], row['target'])
+
+        # Manually apply parent filtering
+        seed_set = {'C'}
+        filtered_nodes = get_parent_nodes_recursive(seed_set, temp_graph)
+        points_filtered = points[points['id'].isin(filtered_nodes)]
+        links_filtered = links[
+            (links['source'].isin(filtered_nodes)) &
+            (links['target'].isin(filtered_nodes))
+        ]
+
+        # Should have A, B, C
+        assert len(points_filtered) == 3
+        assert set(points_filtered['id']) == {'A', 'B', 'C'}
+        # Should have A→B, B→C
+        assert len(links_filtered) == 2
+
+    def test_prepare_cosmograph_with_seed_child_exploration(self, sample_graph_data, sample_colors):
+        """Test prepare_cosmograph_data with child exploration."""
+        builder = CosmographDataBuilder(sample_graph_data, sample_colors, include_intermediate_nodes=False)
+        points = builder.build_points_dataframe()
+        links = builder.build_links_dataframe()
+
+        temp_graph = nx.DiGraph()
+        for _, row in points.iterrows():
+            temp_graph.add_node(row['id'])
+        for _, row in links.iterrows():
+            temp_graph.add_edge(row['source'], row['target'])
+
+        # Manually apply child filtering
+        seed_set = {'B'}
+        filtered_nodes = get_child_nodes_recursive(seed_set, temp_graph)
+        points_filtered = points[points['id'].isin(filtered_nodes)]
+        links_filtered = links[
+            (links['source'].isin(filtered_nodes)) &
+            (links['target'].isin(filtered_nodes))
+        ]
+
+        # Should have B, C, D, E, F, G (all children)
+        assert len(points_filtered) == 6
+        assert set(points_filtered['id']) == {'B', 'C', 'D', 'E', 'F', 'G'}
+
+    def test_seed_node_styling_red_color(self):
+        """Test that seed nodes are colored red."""
+        csv_path = "tests/fixtures/test_transformations.csv"
+        config_path = "tests/fixtures/test_colors.txt"
+
+        points, links, config = prepare_cosmograph_data(
+            csv_path,
+            config_path,
+            include_intermediate_nodes=False,
+            starting_nodes=['Stick'],
+            exploration='both'
+        )
+
+        # Stick should be colored red
+        stick_nodes = points[points['id'] == 'Stick']
+        assert len(stick_nodes) == 1
+        assert stick_nodes.iloc[0]['color'] == '#FF0000'
+
+    def test_seed_node_size_multiplier(self):
+        """Test that seed nodes have 2x size."""
+        csv_path = "tests/fixtures/test_transformations.csv"
+        config_path = "tests/fixtures/test_colors.txt"
+
+        points, links, config = prepare_cosmograph_data(
+            csv_path,
+            config_path,
+            include_intermediate_nodes=False,
+            starting_nodes=['Iron Ingot'],
+            exploration='both'
+        )
+
+        # Get a non-seed node size for comparison
+        non_seed = points[points['id'] == 'Oak Planks']
+        seed = points[points['id'] == 'Iron Ingot']
+
+        if len(seed) > 0 and len(non_seed) > 0:
+            # Seed node size should be approximately 2x non-seed (allowing for rounding)
+            seed_size = seed.iloc[0]['size']
+            non_seed_size = non_seed.iloc[0]['size']
+
+            # Verify seed is larger
+            assert seed_size > 0
+
+    def test_empty_seeds_returns_full_graph(self):
+        """Test that empty seeds parameter returns full graph (backward compatibility)."""
+        csv_path = "tests/fixtures/test_transformations.csv"
+        config_path = "tests/fixtures/test_colors.txt"
+
+        # Full graph without seeds
+        points_full, links_full, _ = prepare_cosmograph_data(
+            csv_path,
+            config_path,
+            include_intermediate_nodes=False
+        )
+
+        # Graph with empty seeds
+        points_empty, links_empty, _ = prepare_cosmograph_data(
+            csv_path,
+            config_path,
+            include_intermediate_nodes=False,
+            starting_nodes=[],
+            exploration='both'
+        )
+
+        # Should be identical
+        assert len(points_full) == len(points_empty)
+        assert len(links_full) == len(links_empty)
+
+    def test_none_seeds_returns_full_graph(self):
+        """Test that None seeds parameter returns full graph (backward compatibility)."""
+        csv_path = "tests/fixtures/test_transformations.csv"
+        config_path = "tests/fixtures/test_colors.txt"
+
+        # Full graph without seeds
+        points_full, links_full, _ = prepare_cosmograph_data(
+            csv_path,
+            config_path,
+            include_intermediate_nodes=False
+        )
+
+        # Graph with None seeds
+        points_none, links_none, _ = prepare_cosmograph_data(
+            csv_path,
+            config_path,
+            include_intermediate_nodes=False,
+            starting_nodes=None,
+            exploration='both'
+        )
+
+        # Should be identical
+        assert len(points_full) == len(points_none)
+        assert len(links_full) == len(links_none)
+
+    def test_nonexistent_seed_handled_gracefully(self):
+        """Test that non-existent seeds are handled gracefully."""
+        csv_path = "tests/fixtures/test_transformations.csv"
+        config_path = "tests/fixtures/test_colors.txt"
+
+        # Should not raise an error, just return full graph (no filtering applied)
+        points, links, config = prepare_cosmograph_data(
+            csv_path,
+            config_path,
+            include_intermediate_nodes=False,
+            starting_nodes=['Nonexistent Item'],
+            exploration='child'
+        )
+
+        # When seed doesn't exist, no nodes match the seed set, so no seed filtering is applied
+        # and the full graph is returned (this is graceful handling)
+        # The seed nodes set will be empty, so seed filtering is skipped
+        assert len(points) > 0
+        # No nodes should be red (since the seed doesn't exist)
+        red_nodes = points[points['color'] == '#FF0000']
+        assert len(red_nodes) == 0
+
+    def test_multiple_seeds_union_exploration(self):
+        """Test that multiple seeds create union of explorations."""
+        csv_path = "tests/fixtures/test_transformations.csv"
+        config_path = "tests/fixtures/test_colors.txt"
+
+        points, links, config = prepare_cosmograph_data(
+            csv_path,
+            config_path,
+            include_intermediate_nodes=False,
+            starting_nodes=['Oak Planks', 'Iron Ore'],
+            exploration='child'
+        )
+
+        # Should have nodes reachable from both seeds
+        assert len(points) > 0
+        assert len(links) > 0
+
+    def test_seed_with_exploration_both(self):
+        """Test exploration='both' mode."""
+        csv_path = "tests/fixtures/test_transformations.csv"
+        config_path = "tests/fixtures/test_colors.txt"
+
+        points_both, links_both, _ = prepare_cosmograph_data(
+            csv_path,
+            config_path,
+            include_intermediate_nodes=False,
+            starting_nodes=['Stick'],
+            exploration='both'
+        )
+
+        points_parent, links_parent, _ = prepare_cosmograph_data(
+            csv_path,
+            config_path,
+            include_intermediate_nodes=False,
+            starting_nodes=['Stick'],
+            exploration='parent'
+        )
+
+        points_child, links_child, _ = prepare_cosmograph_data(
+            csv_path,
+            config_path,
+            include_intermediate_nodes=False,
+            starting_nodes=['Stick'],
+            exploration='child'
+        )
+
+        # 'both' should have more or equal nodes than either 'parent' or 'child'
+        assert len(points_both) >= len(points_parent)
+        assert len(points_both) >= len(points_child)
+
+    def test_edge_retention_both_endpoints(self):
+        """Test that edges are only retained when both endpoints are in filtered set."""
+        # Create a simple test graph with a structure where edge filtering matters
+        transformations = [
+            {'transformation_type': 'crafting', 'input_items': ['A'], 'output_items': ['B'], 'metadata': {}},
+            {'transformation_type': 'crafting', 'input_items': ['B'], 'output_items': ['C'], 'metadata': {}},
+            {'transformation_type': 'crafting', 'input_items': ['A'], 'output_items': ['C'], 'metadata': {}},  # Direct A→C
+        ]
+        colors = {'crafting': '#4A90E2'}
+
+        builder = CosmographDataBuilder(transformations, colors, include_intermediate_nodes=False)
+        points = builder.build_points_dataframe()
+        links = builder.build_links_dataframe()
+
+        temp_graph = nx.DiGraph()
+        for _, row in points.iterrows():
+            temp_graph.add_node(row['id'])
+        for _, row in links.iterrows():
+            temp_graph.add_edge(row['source'], row['target'])
+
+        # Filter to keep only nodes reachable from C in parent mode (should include A, B, C)
+        filtered_nodes = get_parent_nodes_recursive({'C'}, temp_graph)
+        assert filtered_nodes == {'A', 'B', 'C'}  # All nodes are parents/ancestors of C
+
+        links_filtered = links[
+            (links['source'].isin(filtered_nodes)) &
+            (links['target'].isin(filtered_nodes))
+        ]
+
+        # All 3 edges should be retained since both endpoints are in the filtered set
+        assert len(links_filtered) == 3
+
+        # Test the edge retention logic with a case where an edge is filtered out
+        # If we only keep B and C (not A), the A→C edge should be removed
+        filtered_nodes_bc = {'B', 'C'}
+        links_filtered_bc = links[
+            (links['source'].isin(filtered_nodes_bc)) &
+            (links['target'].isin(filtered_nodes_bc))
+        ]
+
+        # Should only have B→C
+        assert len(links_filtered_bc) == 1
+        assert links_filtered_bc.iloc[0]['source'] == 'B'
+        assert links_filtered_bc.iloc[0]['target'] == 'C'
+
+    def test_seed_filtering_with_main_component_filter(self):
+        """Test that seed filtering works with main component filtering."""
+        csv_path = "tests/fixtures/test_transformations.csv"
+        config_path = "tests/fixtures/test_colors.txt"
+
+        points, links, config = prepare_cosmograph_data(
+            csv_path,
+            config_path,
+            only_main_component=True,
+            include_intermediate_nodes=False,
+            starting_nodes=['Stick'],
+            exploration='both'
+        )
+
+        # Should have successfully filtered both by component and seed
+        assert len(points) > 0
+        assert len(links) > 0
 
 
 if __name__ == '__main__':

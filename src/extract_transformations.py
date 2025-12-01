@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 from typing import List, Set
 
-from core.data_models import Item, Transformation
+from core.data_models import Item, Transformation, TransformationType
 from core.parsers import (
     parse_bartering,
     parse_brewing,
@@ -29,6 +29,95 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+# Manual fixes to add missing transformations and items
+# Format: (transformation_type, input_items, output_items, metadata)
+# where input_items and output_items are lists of (item_name, item_url) tuples
+MANUAL_FIXES_ADD: List[tuple] = [
+    ("mob_drop", [("Evoker", "https://minecraft.wiki/w/Evoker")], [("Totem Of Undying", "https://minecraft.wiki/w/Totem_of_Undying")], {}),
+    ("mob_drop", [("Evoker", "https://minecraft.wiki/w/Evoker")], [("Emerald", "https://minecraft.wiki/w/Emerald")], {}),
+    ("mob_drop", [("Vindicator", "https://minecraft.wiki/w/Vindicator")], [("Emerald", "https://minecraft.wiki/w/Emerald")], {}),
+    ("mob_drop", [("Vindicator", "https://minecraft.wiki/w/Vindicator")], [("Ominous Bottle", "https://minecraft.wiki/w/Ominous_Bottle")], {}),
+    ("mob_drop", [("Witch", "https://minecraft.wiki/w/Witch")], [("Redstone Dust", "https://minecraft.wiki/w/Redstone_Dust")], {}),
+    ("mob_drop", [("Witch", "https://minecraft.wiki/w/Witch")], [("Glass Bottle", "https://minecraft.wiki/w/Glass_Bottle")], {}),
+    ("mob_drop", [("Witch", "https://minecraft.wiki/w/Witch")], [("Glowstone Dust", "https://minecraft.wiki/w/Glowstone_Dust")], {}),
+    ("mob_drop", [("Witch", "https://minecraft.wiki/w/Witch")], [("Gunpowder", "https://minecraft.wiki/w/Gunpowder")], {}),
+    ("mob_drop", [("Witch", "https://minecraft.wiki/w/Witch")], [("Spider Eye", "https://minecraft.wiki/w/Spider_Eye")], {}),
+    ("mob_drop", [("Witch", "https://minecraft.wiki/w/Witch")], [("Sugar", "https://minecraft.wiki/w/Sugar")], {}),
+    ("mob_drop", [("Witch", "https://minecraft.wiki/w/Witch")], [("Stick", "https://minecraft.wiki/w/Stick")], {}),
+    ("world_interaction", [("Log", "https://minecraft.wiki/w/Log"), ("Axe", "https://minecraft.wiki/w/Axe")], [("Stripped Log", "https://minecraft.wiki/w/Stripped_Log")], {}),
+]
+
+# Manual fixes to remove transformations and items
+# List of item name patterns to match and remove (e.g., "Potion of Big", "Arrow of Fire")
+# Any transformation containing an input or output matching these patterns will be removed
+MANUAL_FIXES_REMOVE: List[str] = [
+        "Potion of Big", "Potion of Small", "Potion of Sticky", "Potion of Decay"
+]
+
+
+def apply_manual_fixes(transformations: List[Transformation]) -> List[Transformation]:
+    """
+    Apply manual fixes to add and remove transformations and items.
+
+    Args:
+        transformations: List of extracted transformations
+
+    Returns:
+        List of transformations with manual fixes applied
+    """
+    # Apply removals first
+    if MANUAL_FIXES_REMOVE:
+        logger.info("Applying manual removals...")
+        original_count = len(transformations)
+
+        transformations = [
+            t for t in transformations
+            if not any(
+                pattern in item.name
+                for pattern in MANUAL_FIXES_REMOVE
+                for item in t.inputs + t.outputs
+            )
+        ]
+
+        removed_count = original_count - len(transformations)
+        if removed_count > 0:
+            logger.info(f"  Removed {removed_count} transformations matching removal patterns")
+
+    # Apply additions
+    if MANUAL_FIXES_ADD:
+        logger.info("Applying manual additions...")
+
+        for fix in MANUAL_FIXES_ADD:
+            transformation_type_str, input_items, output_items, metadata = fix
+
+            # Convert string type to enum
+            try:
+                transformation_type = TransformationType(transformation_type_str)
+            except ValueError:
+                logger.error(f"  Invalid transformation type: {transformation_type_str}")
+                continue
+
+            # Convert tuples to Item objects
+            inputs = [Item(name=name, url=url) for name, url in input_items]
+            outputs = [Item(name=name, url=url) for name, url in output_items]
+
+            # Create transformation
+            try:
+                transformation = Transformation(
+                    transformation_type=transformation_type,
+                    inputs=inputs,
+                    outputs=outputs,
+                    metadata=metadata
+                )
+                transformations.append(transformation)
+                logger.info(f"  Added: {transformation_type_str} ({inputs[0].name} -> {outputs[0].name})")
+            except ValueError as e:
+                logger.error(f"  Failed to create transformation: {e}")
+
+        logger.info(f"Applied {len(MANUAL_FIXES_ADD)} manual additions")
+
+    return transformations
 
 
 def load_html_file(filepath: str) -> str:
@@ -255,6 +344,9 @@ def main() -> None:
     if not transformations:
         logger.warning("No transformations found. Check your data files.")
         return
+
+    # Apply manual fixes
+    transformations = apply_manual_fixes(transformations)
 
     # Extract unique items
     items = extract_unique_items(transformations)
