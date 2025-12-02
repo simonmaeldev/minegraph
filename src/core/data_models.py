@@ -19,6 +19,7 @@ class TransformationType(Enum):
     SMOKER = "smoker"
     STONECUTTER = "stonecutter"
     TRADING = "trading"
+    WORLD_INTERACTION = "world_interaction"
 
 
 @dataclass(frozen=True)

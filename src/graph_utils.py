@@ -37,16 +37,28 @@ class Graph3DBuilder:
         if not self.graph.has_node(item_name):
             self.graph.add_node(item_name, node_type='item')
 
-    def create_intermediate_node(self) -> str:
+    def create_intermediate_node(self, input_items: List[str] = None, output_item: str = None) -> str:
         """
         Create a unique intermediate node for multi-input transformations.
+
+        Args:
+            input_items: Optional list of input item names
+            output_item: Optional output item name
 
         Returns:
             Unique identifier for the intermediate node
         """
         node_id = f"intermediate_{self.intermediate_counter}"
+
+        # Create a descriptive label if input/output information is provided
+        if input_items and output_item:
+            inputs_str = "+".join(input_items)
+            label = f"intermediate_node|{inputs_str}={output_item}"
+        else:
+            label = ""
+
         self.intermediate_counter += 1
-        self.graph.add_node(node_id, node_type='intermediate')
+        self.graph.add_node(node_id, node_type='intermediate', label=label)
         return node_id
 
     def add_edge(self, from_node: str, to_node: str, transformation_type: str) -> None:
@@ -92,8 +104,8 @@ class Graph3DBuilder:
             output_item: Name of the output item
             transformation_type: Type of transformation
         """
-        # Create intermediate node
-        intermediate = self.create_intermediate_node()
+        # Create intermediate node with input/output information
+        intermediate = self.create_intermediate_node(input_items, output_item)
 
         # Add edges from all inputs to intermediate
         for input_item in input_items:

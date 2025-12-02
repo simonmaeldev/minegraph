@@ -41,11 +41,11 @@ import networkx as nx
 # Import graph building functions from graph utilities
 try:
     # Try package-style import first (for pytest and module usage)
-    from src.graph_utils import load_transformations_from_csv
+    from src.graph_utils import load_transformations_from_csv, build_graph_from_csv
     from src.visualize_graph_3d import load_color_config
 except ModuleNotFoundError:
     # Fall back to direct import (for script execution)
-    from graph_utils import load_transformations_from_csv
+    from graph_utils import load_transformations_from_csv, build_graph_from_csv
     from visualize_graph_3d import load_color_config
 
 
@@ -587,7 +587,7 @@ def analyze_leaf_nodes(graph: nx.DiGraph) -> None:
         print("  No leaf nodes found (all nodes have outgoing edges)")
 
 
-def analyze_betweenness_centrality(graph: nx.DiGraph, top_n: int = 10) -> None:
+def analyze_betweenness_centrality(graph: nx.DiGraph, top_n: int = 10) -> List[str]:
     """
     Calculate and display betweenness centrality for the graph.
 
@@ -598,6 +598,9 @@ def analyze_betweenness_centrality(graph: nx.DiGraph, top_n: int = 10) -> None:
     Args:
         graph: NetworkX directed graph
         top_n: Number of top nodes to display (default: 10)
+
+    Returns:
+        Complete sorted list of item names (highest centrality first)
     """
     print_section_header("Betweenness Centrality Analysis")
 
@@ -605,11 +608,11 @@ def analyze_betweenness_centrality(graph: nx.DiGraph, top_n: int = 10) -> None:
 
     if num_nodes == 0:
         print("  Cannot compute betweenness centrality: graph has no nodes")
-        return
+        return []
 
     if num_nodes < 2:
         print("  Cannot compute betweenness centrality: graph needs at least 2 nodes")
-        return
+        return []
 
     print(f"  Computing betweenness centrality for {num_nodes} nodes...")
     print("  (This measures how often a node lies on shortest paths)")
@@ -620,6 +623,9 @@ def analyze_betweenness_centrality(graph: nx.DiGraph, top_n: int = 10) -> None:
     # Sort nodes by betweenness centrality (descending)
     sorted_nodes = sorted(betweenness.items(), key=lambda x: x[1], reverse=True)
 
+    # Extract just the node names in sorted order
+    sorted_node_names = [node for node, _ in sorted_nodes]
+
     # Display top N nodes
     print(f"\n  Top {min(top_n, len(sorted_nodes))} nodes by betweenness centrality:")
     print()
@@ -628,6 +634,9 @@ def analyze_betweenness_centrality(graph: nx.DiGraph, top_n: int = 10) -> None:
 
     if len(sorted_nodes) > top_n:
         print(f"\n  ... and {len(sorted_nodes) - top_n} more nodes")
+
+    # Return the complete sorted list of node names
+    return sorted_node_names
 
 
 def analyze_eigenvector_centrality(graph: nx.DiGraph, top_n: int = 10) -> None:
@@ -680,13 +689,16 @@ def analyze_eigenvector_centrality(graph: nx.DiGraph, top_n: int = 10) -> None:
         print(f"  ERROR: Could not compute eigenvector centrality: {e}")
 
 
-def analyze_voterank(graph: nx.DiGraph, top_n: int = 10) -> None:
+def analyze_voterank(graph: nx.DiGraph, top_n: int = 10) -> List[str]:
     """
     Calculate and display voterank for the graph.
 
     Args:
         graph: NetworkX directed graph
         top_n: Number of top nodes to display (default: 10)
+
+    Returns:
+        Complete sorted list of item names (highest ranked first)
     """
     print_section_header("VoteRank Analysis")
 
@@ -694,11 +706,11 @@ def analyze_voterank(graph: nx.DiGraph, top_n: int = 10) -> None:
 
     if num_nodes == 0:
         print("  Cannot compute vote rank: graph has no nodes")
-        return
+        return []
 
     if num_nodes < 2:
         print("  Cannot compute vote rank: graph needs at least 2 nodes")
-        return
+        return []
 
     print(f"  Computing vote rank for {num_nodes} nodes...")
 
@@ -712,9 +724,12 @@ def analyze_voterank(graph: nx.DiGraph, top_n: int = 10) -> None:
         for i, node in enumerate(voterank[:top_n], 1):
             print(f"  {i:2d}. {node:40s}")
 
+        # Return the complete sorted list
+        return voterank
+
     except nx.NetworkXError as e:
         print(f"  ERROR: Could not compute voterank: {e}")
-
+        return []
 
 def add_score_parents(
     starting_node: str,
@@ -722,7 +737,8 @@ def add_score_parents(
     to_process: set[str],
     processed: set[str],
     scores: dict[str, float],
-    depth: int = 1
+    depth: int = 1,
+    skip_intermediate: bool = False
 ) -> None:
     """
     Recursively traverse parent nodes and increment their scores based on depth.
@@ -730,8 +746,11 @@ def add_score_parents(
     This function performs a recursive backward traversal through the graph,
     starting from a given node and visiting all ancestor nodes (parents).
     Each visited node gets 1/depth added to its score, where depth starts at 1
-    for the starting node. The function uses sets to track processed and
-    to-process nodes to prevent infinite loops in cyclic graphs.
+    for the starting node. Intermediate nodes (marked with node_type='intermediate')
+    are never scored, but can optionally be skipped during traversal.
+
+    The function uses sets to track processed and to-process nodes to prevent
+    infinite loops in cyclic graphs.
 
     Args:
         starting_node: The node to start traversal from
@@ -740,21 +759,36 @@ def add_score_parents(
         processed: Set of nodes that have already been processed
         scores: Dictionary mapping node names to their accumulated scores
         depth: Current depth in traversal (starts at 1)
+        skip_intermediate: If True, don't explore through intermediate nodes
+                          (default: False, explore through intermediate nodes)
 
     Returns:
         None (modifies scores, to_process, and processed in-place)
     """
-    # Initialize score for this node if not present, then add 1/depth
-    if starting_node not in scores:
-        scores[starting_node] = 0
-    scores[starting_node] += 1 / depth
+    # Check if this is an intermediate node
+    is_intermediate = graph.nodes[starting_node].get('node_type') == 'intermediate'
 
     # Get all parent nodes (predecessors in directed graph)
     parents = list(graph.predecessors(starting_node))
+    non_intermediate_parents = [parent for parent in parents if graph.nodes[parent].get('node_type') != 'intermediate']
+
+    # Only score non-intermediate nodes
+    if not is_intermediate and len(non_intermediate_parents)==0:
+        if starting_node not in scores:
+            scores[starting_node] = 0
+        #scores[starting_node] += depth
+        #scores[starting_node] += 1 / depth
+        scores[starting_node] += 1
 
     # Add unprocessed parents to the to_process set with incremented depth
     for parent in parents:
-        if parent not in processed and parent not in to_process:
+        # Skip this parent if:
+        # 1. We're skipping intermediate nodes AND this parent is intermediate, OR
+        # 2. The parent has already been processed or is in queue
+        parent_is_intermediate = graph.nodes[parent].get('node_type') == 'intermediate'
+        should_skip = (skip_intermediate and parent_is_intermediate)
+
+        if not should_skip and parent not in processed and parent not in to_process:
             to_process.add((parent, depth + 1))
 
     # Mark current node as processed
@@ -769,32 +803,38 @@ def add_score_parents(
         else:
             next_node = next_item
             next_depth = depth + 1
-        add_score_parents(next_node, graph, to_process, processed, scores, next_depth)
+        add_score_parents(next_node, graph, to_process, processed, scores, next_depth, skip_intermediate)
 
 
 def analyze_parent_score(
     graph: nx.DiGraph,
-    voterank_top_n: int = 20,
-    display_top_n: int = 20
+    item_list: List[str],
+    display_top_n: int = 20,
+    skip_intermediate: bool = False
 ) -> None:
     """
     Analyze parent scores by propagating importance backward through the graph.
 
     This metric identifies "critical base materials" by computing which items
     appear in the ancestry of many important items. It works by:
-    1. Using VoteRank to identify the top N most important items
+    1. Starting with a pre-computed list of important items
     2. For each important item, recursively traversing all parent nodes
-    3. Incrementing a score for each parent encountered
+    3. Incrementing a score for each parent encountered (non-intermediate nodes only)
     4. Ranking items by their accumulated scores
 
     High-scoring items are critical base materials that contribute to many
-    important end products. This complements VoteRank, which identifies
-    important end products but doesn't show which base materials are needed.
+    important end products. This complements other ranking metrics, which identify
+    important end products but don't show which base materials are needed.
+
+    Note: Intermediate nodes are never scored, and can optionally be skipped
+    during traversal using the skip_intermediate flag.
 
     Args:
         graph: NetworkX directed graph to analyze
-        voterank_top_n: Number of top VoteRank items to use as starting points
+        item_list: List of items to use as importance sources (pre-computed list)
         display_top_n: Number of top parent score items to display
+        skip_intermediate: If True, don't traverse through intermediate nodes
+                          (default: False, traverse through them)
 
     Returns:
         None (prints analysis to console)
@@ -807,22 +847,21 @@ def analyze_parent_score(
         print("  Cannot compute parent score: graph needs at least 2 nodes")
         return
 
+    if not item_list:
+        print("  Cannot compute parent score: item_list is empty")
+        return
+
     print(f"  Computing parent scores for {num_nodes} nodes...")
-    print(f"  Using top {voterank_top_n} VoteRank items as importance sources...")
+    print(f"  Using {len(item_list)} pre-computed items as importance sources...")
+    if skip_intermediate:
+        print("  (Skipping traversal through intermediate nodes)")
 
     try:
-        # Get important items using VoteRank
-        voterank_items = nx.voterank(graph, voterank_top_n)
-
-        if not voterank_items:
-            print("  ERROR: VoteRank returned no items")
-            return
-
         # Initialize scores dictionary (now uses float for depth-based scoring)
         scores: dict[str, float] = {}
 
-        # Process each VoteRank item
-        for item in voterank_items:
+        # Process each item from the provided list
+        for item in item_list:
             # Initialize processing set with the starting item at depth 1
             to_process: set = {(item, 1)}
             processed: set[str] = set()
@@ -831,7 +870,7 @@ def analyze_parent_score(
             while to_process:
                 next_item = to_process.pop()
                 next_node, next_depth = next_item
-                add_score_parents(next_node, graph, to_process, processed, scores, next_depth)
+                add_score_parents(next_node, graph, to_process, processed, scores, next_depth, skip_intermediate)
 
         # Sort items by score (descending)
         sorted_items = sorted(scores.items(), key=lambda x: x[1], reverse=True)
@@ -871,8 +910,12 @@ def main() -> int:
         if args.filter_type:
             filter_types = [t.strip() for t in args.filter_type.split(',')]
 
-        # Load the graph
-        graph = load_graph(args.input, args.config, filter_types)
+        # Load color configuration
+        color_config = load_color_config(args.config)
+
+        # Create two graphs: one without intermediate nodes and one with intermediate nodes
+        graph_without_intermediate = build_analysis_graph_from_csv(args.input, color_config, filter_types)
+        graph_with_intermediate = build_graph_from_csv(args.input, color_config, filter_types)
 
         print("\n" + "=" * 60)
         print("  MINECRAFT TRANSFORMATION GRAPH ANALYSIS")
@@ -888,11 +931,11 @@ def main() -> int:
         print("  GLOBAL ANALYSIS (Full Graph)")
         print("=" * 60)
 
-        analyze_average_degree(graph)
-        analyze_max_degree(graph)
-        analyze_connected_components(graph)
-        analyze_edge_count(graph)
-        analyze_density(graph)
+        analyze_average_degree(graph_without_intermediate)
+        analyze_max_degree(graph_without_intermediate)
+        analyze_connected_components(graph_without_intermediate)
+        analyze_edge_count(graph_without_intermediate)
+        analyze_density(graph_without_intermediate)
 
         # ============================================================
         # MAIN COMPONENT ANALYSIS
@@ -901,23 +944,28 @@ def main() -> int:
         print("  MAIN COMPONENT ANALYSIS")
         print("=" * 60)
 
-        # Extract the main connected component
-        main_component = get_main_component(graph)
+        # Extract main components for both graph versions
+        main_component_without = get_main_component(graph_without_intermediate)
+        main_component_with = get_main_component(graph_with_intermediate)
 
-        print(f"\nMain component contains {main_component.number_of_nodes()} nodes "
-              f"and {main_component.number_of_edges()} edges")
+        print(f"\nMain component (without intermediate nodes) contains {main_component_without.number_of_nodes()} nodes "
+              f"and {main_component_without.number_of_edges()} edges")
+        print(f"Main component (with intermediate nodes) contains {main_component_with.number_of_nodes()} nodes "
+              f"and {main_component_with.number_of_edges()} edges")
 
-        # Run focused analysis on main component
-        analyze_root_nodes(main_component)
-        analyze_leaf_nodes(main_component)
-        analyze_betweenness_centrality(main_component, top_n=10)
-        #analyze_eigenvector_centrality(main_component, top_n=10)
-        analyze_voterank(main_component, top_n=20)
-        analyze_parent_score(main_component, voterank_top_n=20, display_top_n=20)
+        # Run focused analysis on main component (using graph without intermediate nodes for most metrics)
+        analyze_root_nodes(main_component_without)
+        analyze_leaf_nodes(main_component_without)
+        betweenness_items = analyze_betweenness_centrality(main_component_without, top_n=10)
+        #analyze_eigenvector_centrality(main_component_without, top_n=10)
+        voterank_items = analyze_voterank(main_component_without, top_n=20)
+
+        # Use pre-computed list for parent score with graph containing intermediate nodes
+        analyze_parent_score(main_component_with, voterank_items[:20], display_top_n=20, skip_intermediate=True)
         #scores = {}
         #add_score_parents("Redstone Dust", graph, set(), set(), scores)
         #print(scores)
-        res = sorted(nx.strongly_connected_components(main_component), key=len, reverse=True)
+        res = sorted(nx.strongly_connected_components(main_component_without), key=len, reverse=True)
 
         for s in res : 
             if len(s) > 1:

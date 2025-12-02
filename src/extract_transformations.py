@@ -45,7 +45,9 @@ MANUAL_FIXES_ADD: List[tuple] = [
     ("mob_drop", [("Witch", "https://minecraft.wiki/w/Witch")], [("Spider Eye", "https://minecraft.wiki/w/Spider_Eye")], {}),
     ("mob_drop", [("Witch", "https://minecraft.wiki/w/Witch")], [("Sugar", "https://minecraft.wiki/w/Sugar")], {}),
     ("mob_drop", [("Witch", "https://minecraft.wiki/w/Witch")], [("Stick", "https://minecraft.wiki/w/Stick")], {}),
-    ("world_interaction", [("Log", "https://minecraft.wiki/w/Log"), ("Axe", "https://minecraft.wiki/w/Axe")], [("Stripped Log", "https://minecraft.wiki/w/Stripped_Log")], {}),
+    ("world_interaction", [("Log", "https://minecraft.wiki/w/Log")], [("Stripped Log", "https://minecraft.wiki/w/Stripped_Log")], {}),
+    ("world_interaction", [("Wood", "https://minecraft.wiki/w/Wood")], [("Stripped Wood", "https://minecraft.wiki/w/Stripped_Wood")], {}),
+    ("world_interaction", [("Block of Bamboo", "https://minecraft.wiki/w/Block_of_Bamboo")], [("Block of Stripped Bamboo", "https://minecraft.wiki/w/Block_of_Stripped_Bamboo")], {}),
 ]
 
 # Manual fixes to remove transformations and items

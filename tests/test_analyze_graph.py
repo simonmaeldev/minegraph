@@ -20,6 +20,9 @@ from analyze_graph import (
     analyze_connected_components,
     analyze_edge_count,
     analyze_density,
+    analyze_voterank,
+    analyze_betweenness_centrality,
+    analyze_parent_score,
     load_graph,
     parse_arguments
 )
@@ -567,3 +570,260 @@ def test_very_sparse_graph():
 
     analyze_density(G)
     # Test passes if no exceptions raised
+
+
+# ============================================================
+# Tests for analyze_voterank
+# ============================================================
+
+def test_analyze_voterank_empty_graph(empty_graph, capsys):
+    """Test voterank on empty graph."""
+    result = analyze_voterank(empty_graph, top_n=10)
+    assert result == []
+    captured = capsys.readouterr()
+    assert "Cannot compute vote rank: graph has no nodes" in captured.out
+
+
+def test_analyze_voterank_single_node(single_node_graph, capsys):
+    """Test voterank on single node graph."""
+    result = analyze_voterank(single_node_graph, top_n=10)
+    assert result == []
+    captured = capsys.readouterr()
+    assert "Cannot compute vote rank: graph needs at least 2 nodes" in captured.out
+
+
+def test_analyze_voterank_simple_chain(simple_chain_graph, capsys):
+    """Test voterank on simple chain returns a list."""
+    result = analyze_voterank(simple_chain_graph, top_n=10)
+    assert isinstance(result, list)
+    # For a chain A -> B -> C, voterank should return nodes in order of importance
+    assert len(result) > 0
+    # Verify output shows voterank analysis
+    captured = capsys.readouterr()
+    assert "VoteRank Analysis" in captured.out
+    assert "Top" in captured.out
+
+
+def test_analyze_voterank_hub_graph(hub_graph, capsys):
+    """Test voterank on hub graph returns non-empty list."""
+    result = analyze_voterank(hub_graph, top_n=5)
+    assert isinstance(result, list)
+    assert len(result) > 0
+    # Hub should likely be in the results
+    captured = capsys.readouterr()
+    assert "VoteRank Analysis" in captured.out
+
+
+# ============================================================
+# Tests for analyze_betweenness_centrality
+# ============================================================
+
+def test_analyze_betweenness_centrality_empty_graph(empty_graph, capsys):
+    """Test betweenness centrality on empty graph."""
+    result = analyze_betweenness_centrality(empty_graph, top_n=10)
+    assert result == []
+    captured = capsys.readouterr()
+    assert "Cannot compute betweenness centrality: graph has no nodes" in captured.out
+
+
+def test_analyze_betweenness_centrality_single_node(single_node_graph, capsys):
+    """Test betweenness centrality on single node graph."""
+    result = analyze_betweenness_centrality(single_node_graph, top_n=10)
+    assert result == []
+    captured = capsys.readouterr()
+    assert "Cannot compute betweenness centrality: graph needs at least 2 nodes" in captured.out
+
+
+def test_analyze_betweenness_centrality_simple_chain(simple_chain_graph, capsys):
+    """Test betweenness centrality on simple chain returns sorted list."""
+    result = analyze_betweenness_centrality(simple_chain_graph, top_n=10)
+    assert isinstance(result, list)
+    assert len(result) == 3  # A, B, C
+    # B should be first (highest centrality as it's in the middle)
+    assert result[0] == "B"
+    assert "A" in result and "C" in result
+    # Verify output shows betweenness centrality analysis
+    captured = capsys.readouterr()
+    assert "Betweenness Centrality Analysis" in captured.out
+
+
+def test_analyze_betweenness_centrality_hub_graph(hub_graph, capsys):
+    """Test betweenness centrality on hub graph returns list with Hub first."""
+    result = analyze_betweenness_centrality(hub_graph, top_n=5)
+    assert isinstance(result, list)
+    assert len(result) > 0
+    # Hub should have highest betweenness centrality
+    assert result[0] == "Hub"
+    captured = capsys.readouterr()
+    assert "Betweenness Centrality Analysis" in captured.out
+
+
+# ============================================================
+# Tests for analyze_parent_score
+# ============================================================
+
+def test_analyze_parent_score_empty_item_list(simple_chain_graph, capsys):
+    """Test parent score with empty item list."""
+    analyze_parent_score(simple_chain_graph, [], display_top_n=20)
+    captured = capsys.readouterr()
+    assert "Cannot compute parent score: item_list is empty" in captured.out
+
+
+def test_analyze_parent_score_single_node(single_node_graph, capsys):
+    """Test parent score with single node graph."""
+    analyze_parent_score(single_node_graph, ["A"], display_top_n=20)
+    captured = capsys.readouterr()
+    assert "Cannot compute parent score: graph needs at least 2 nodes" in captured.out
+
+
+def test_analyze_parent_score_with_item_list(simple_chain_graph, capsys):
+    """Test parent score with pre-computed item list."""
+    # Use C as the starting item (end of chain)
+    item_list = ["C"]
+    analyze_parent_score(simple_chain_graph, item_list, display_top_n=20)
+    captured = capsys.readouterr()
+    assert "Parent Score Analysis" in captured.out
+    # Should show scores for parents of C
+    assert "items by parent score" in captured.out
+
+
+def test_analyze_parent_score_multi_item_list(hub_graph, capsys):
+    """Test parent score with multiple items in list."""
+    # Use E, F, G, H (outputs from Hub)
+    item_list = ["E", "F", "G", "H"]
+    analyze_parent_score(hub_graph, item_list, display_top_n=20)
+    captured = capsys.readouterr()
+    assert "Parent Score Analysis" in captured.out
+    # Hub should have high parent score as it's parent to all specified items
+    output = captured.out
+    assert "items by parent score" in output
+
+
+# ============================================================
+# Integration Tests for Dual Graph Analysis
+# ============================================================
+
+def test_analyze_voterank_returns_sorted_list(hub_graph, capsys):
+    """Test that analyze_voterank returns full sorted list, not truncated."""
+    voterank_items = analyze_voterank(hub_graph, top_n=3)
+
+    # Should return a list
+    assert isinstance(voterank_items, list)
+    # Should have multiple items
+    assert len(voterank_items) > 0
+    # The list should be sorted by importance (from nx.voterank)
+    captured = capsys.readouterr()
+    assert "VoteRank Analysis" in captured.out
+
+
+def test_analyze_betweenness_centrality_returns_sorted_list(hub_graph, capsys):
+    """Test that analyze_betweenness_centrality returns full sorted list."""
+    betweenness_items = analyze_betweenness_centrality(hub_graph, top_n=3)
+
+    # Should return a list
+    assert isinstance(betweenness_items, list)
+    # Should have multiple items
+    assert len(betweenness_items) > 0
+    # Should be sorted by centrality (highest first)
+    assert betweenness_items[0] == "Hub"  # Hub has highest centrality
+    captured = capsys.readouterr()
+    assert "Betweenness Centrality Analysis" in captured.out
+
+
+def test_parent_score_accepts_betweenness_items(hub_graph, simple_chain_graph, capsys):
+    """Test that parent score can accept betweenness items as input."""
+    # First get betweenness items
+    betweenness_items = analyze_betweenness_centrality(simple_chain_graph, top_n=10)
+
+    # Then pass them to parent score
+    analyze_parent_score(simple_chain_graph, betweenness_items, display_top_n=20)
+
+    captured = capsys.readouterr()
+    assert "Parent Score Analysis" in captured.out
+    # Should show it's using the provided item list
+    assert "pre-computed items" in captured.out
+
+
+# ============================================================
+# Tests for skip_intermediate flag
+# ============================================================
+
+def test_analyze_parent_score_skip_intermediate_flag(simple_chain_graph, capsys):
+    """Test that skip_intermediate flag works in analyze_parent_score."""
+    # Test with skip_intermediate=False (default behavior)
+    analyze_parent_score(simple_chain_graph, ["C"], display_top_n=20, skip_intermediate=False)
+
+    captured = capsys.readouterr()
+    assert "Parent Score Analysis" in captured.out
+    # Should NOT show the skip message
+    assert "Skipping traversal through intermediate nodes" not in captured.out
+
+
+def test_analyze_parent_score_skip_intermediate_shows_message(simple_chain_graph, capsys):
+    """Test that skip_intermediate flag shows message when enabled."""
+    # Test with skip_intermediate=True
+    analyze_parent_score(simple_chain_graph, ["C"], display_top_n=20, skip_intermediate=True)
+
+    captured = capsys.readouterr()
+    assert "Parent Score Analysis" in captured.out
+    # Should show the skip message
+    assert "Skipping traversal through intermediate nodes" in captured.out
+
+
+def test_add_score_parents_intermediate_nodes_never_scored(simple_chain_graph):
+    """Test that intermediate nodes are never scored."""
+    # Create a mixed graph with both item and intermediate nodes
+    graph = nx.DiGraph()
+    graph.add_node("A", node_type='item')
+    graph.add_node("Intermediate_1", node_type='intermediate')
+    graph.add_node("B", node_type='item')
+
+    graph.add_edge("A", "Intermediate_1")
+    graph.add_edge("Intermediate_1", "B")
+
+    # Score starting from B
+    scores = {}
+    to_process = {("B", 1)}
+    processed = set()
+
+    while to_process:
+        next_item = to_process.pop()
+        next_node, next_depth = next_item
+        from analyze_graph import add_score_parents
+        add_score_parents(next_node, graph, to_process, processed, scores, next_depth)
+
+    # B should be scored
+    assert "B" in scores
+    # A should be scored
+    assert "A" in scores
+    # Intermediate_1 should NOT be in scores
+    assert "Intermediate_1" not in scores
+
+
+def test_add_score_parents_skip_intermediate_prevents_traversal():
+    """Test that skip_intermediate flag prevents traversal through intermediate nodes."""
+    graph = nx.DiGraph()
+    graph.add_node("A", node_type='item')
+    graph.add_node("Intermediate_1", node_type='intermediate')
+    graph.add_node("B", node_type='item')
+
+    graph.add_edge("A", "Intermediate_1")
+    graph.add_edge("Intermediate_1", "B")
+
+    # Score starting from B with skip_intermediate=True
+    scores = {}
+    to_process = {("B", 1)}
+    processed = set()
+
+    while to_process:
+        next_item = to_process.pop()
+        next_node, next_depth = next_item
+        from analyze_graph import add_score_parents
+        add_score_parents(next_node, graph, to_process, processed, scores, next_depth, skip_intermediate=True)
+
+    # B should be scored
+    assert "B" in scores
+    # A should NOT be scored (because we skipped the intermediate node)
+    assert "A" not in scores
+    # Intermediate_1 should NOT be in scores
+    assert "Intermediate_1" not in scores

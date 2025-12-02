@@ -172,6 +172,7 @@ class CosmographDataBuilder:
         self.color_config = color_config
         self.include_intermediate_nodes = include_intermediate_nodes
         self.intermediate_counter = 0
+        self.intermediate_labels = {}  # Map intermediate_id -> label
 
     def build_points_dataframe(self) -> pd.DataFrame:
         """Build the points (nodes) DataFrame for Cosmograph.
@@ -211,9 +212,15 @@ class CosmographDataBuilder:
                     intermediate_id = f"intermediate_{self.intermediate_counter}"
                     self.intermediate_counter += 1
 
+                    # Create a descriptive label with input/output information
+                    inputs_str = "+".join(trans['input_items'])
+                    output_str = trans['output_items'][0] if trans['output_items'] else ""
+                    label = f"intermediate_node|{inputs_str}={output_str}"
+                    self.intermediate_labels[intermediate_id] = label
+
                     points_data.append({
                         'id': intermediate_id,
-                        'label': '',  # No label for intermediate nodes
+                        'label': label,
                         'node_type': 'intermediate',
                         'size': float(INTERMEDIATE_NODE_SIZE),
                         'color': INTERMEDIATE_NODE_COLOR

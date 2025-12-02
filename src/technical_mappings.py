@@ -110,6 +110,8 @@ TECHNICAL_MAPPINGS: Dict[str, List[str]] = {
         "Mangrove Wood",
         "Cherry Wood",
         "Pale Oak Wood",
+        "Crimson Hyphae",
+        "Warped Hyphae",
     ],
     # Wood Products - Stripped Wood Blocks
     "Stripped Wood": [
@@ -122,14 +124,6 @@ TECHNICAL_MAPPINGS: Dict[str, List[str]] = {
         "Stripped Mangrove Wood",
         "Stripped Cherry Wood",
         "Stripped Pale Oak Wood",
-    ],
-    # Nether Wood Products - Hyphae
-    "Hyphae": [
-        "Crimson Hyphae",
-        "Warped Hyphae",
-    ],
-    # Nether Wood Products - Stripped Hyphae
-    "Stripped Hyphae": [
         "Stripped Crimson Hyphae",
         "Stripped Warped Hyphae",
     ],
