@@ -630,7 +630,10 @@ def analyze_betweenness_centrality(graph: nx.DiGraph, top_n: int = 10) -> List[s
     print(f"\n  Top {min(top_n, len(sorted_nodes))} nodes by betweenness centrality:")
     print()
     for i, (node, centrality) in enumerate(sorted_nodes[:top_n], 1):
-        print(f"  {i:2d}. {node:40s} {centrality:.6f}")
+        # Get display name: use label if it exists (for intermediate nodes), otherwise use node ID
+        node_label = graph.nodes[node].get('label', node)
+        display_name = node_label if node_label else node
+        print(f"  {i:2d}. {display_name:40s} {centrality:.6f}")
 
     if len(sorted_nodes) > top_n:
         print(f"\n  ... and {len(sorted_nodes) - top_n} more nodes")
@@ -722,7 +725,10 @@ def analyze_voterank(graph: nx.DiGraph, top_n: int = 10) -> List[str]:
         print(f"\n  Top {len(voterank)} nodes by voterank:")
         print()
         for i, node in enumerate(voterank[:top_n], 1):
-            print(f"  {i:2d}. {node:40s}")
+            # Get display name: use label if it exists (for intermediate nodes), otherwise use node ID
+            node_label = graph.nodes[node].get('label', node)
+            display_name = node_label if node_label else node
+            print(f"  {i:2d}. {display_name:40s}")
 
         # Return the complete sorted list
         return voterank
@@ -956,9 +962,9 @@ def main() -> int:
         # Run focused analysis on main component (using graph without intermediate nodes for most metrics)
         analyze_root_nodes(main_component_without)
         analyze_leaf_nodes(main_component_without)
-        betweenness_items = analyze_betweenness_centrality(main_component_without, top_n=10)
+        betweenness_items = analyze_betweenness_centrality(main_component_with, top_n=10)
         #analyze_eigenvector_centrality(main_component_without, top_n=10)
-        voterank_items = analyze_voterank(main_component_without, top_n=20)
+        voterank_items = analyze_voterank(main_component_with, top_n=20)
 
         # Use pre-computed list for parent score with graph containing intermediate nodes
         analyze_parent_score(main_component_with, voterank_items[:20], display_top_n=20, skip_intermediate=True)
